@@ -230,3 +230,91 @@ LO QUE SE COMPROBÓ Y ESTABA BIEN
     textos donde van números, nulos y fechas imposibles.
   · Deshacer, rehacer, copias de seguridad y restaurar.
   · Sincronización entre dos aparatos y los avisos del calendario.
+
+
+==============================================================
+CATÁLOGO DE VALORES Y CARTERAS DE PAPEL
+==============================================================
+
+ARCHIVOS NUEVOS
+
+  catalogo.js  684 acciones, ETFs y fondos para que te los sugiera
+               al escribir. Puedo ampliártelo sin tocar nada más.
+  papel.js     Las carteras imaginarias.
+
+  Al actualizar sustituyes index.html, catalogo.js, papel.js y los
+  demás .js, y subes el número de VERSIÓN de sw.js. config.js no.
+
+
+QUÉ SE ARREGLÓ
+
+  · Un activo añadido «en cartera» desaparecía. La tabla de cartera
+    solo enseña posiciones abiertas, y sin compra registrada no hay
+    posición; como tampoco estaba en vigilancia, no salía en ningún
+    sitio. Ahora, al elegir «En cartera» pide los títulos, el precio
+    y la fecha, y registra la compra sola. Si aun así queda alguno
+    sin compra, la pestaña Cartera lo enseña con dos botones.
+  · Se podía añadir dos veces el mismo ticker, lo que parte el
+    histórico en dos fichas. Ahora te abre la que ya tienes.
+  · No había manera de quitar algo de la lista de vigilancia. Ahora
+    hay botón «Quitar», avisa de lo que se lleva por delante y se
+    puede deshacer. El botón «Vender», que no pintaba nada en algo
+    que no tienes, es ahora «Comprar».
+
+
+LA LISTA DE VIGILANCIA
+
+  Columna «Me gusta» de 0 a 10, con + y −. La lista se ordena por ahí
+  de serie y se va aclarando hacia abajo.
+
+  Arriba están las mismas estrategias del cribado. Al encender una o
+  varias aparece la columna «Nota» y el degradado pasa a ser por esa
+  nota en vez de por la posición. El botón «Pesos» abre el submenú
+  para decidir cuánto pesa cada estrategia; a cero sigue filtrando
+  pero no cuenta para la nota.
+
+  Solo se tiñe de rojo lo que no encaja en NINGUNA de las estrategias
+  puestas: con dos o tres encendidas, fallar alguna es lo normal.
+
+
+EL CATÁLOGO
+
+  Al añadir un activo hay un buscador arriba: escribe «telefonica»,
+  «IWDA» o «cobas» y te rellena ticker, nombre y tipo. Avisa si ya la
+  tienes.
+
+  Trae ticker, nombre, tipo y bolsa. NO trae ISIN ni datos: el ISIN
+  habría que inventármelo y los datos cambian cada día, así que esos
+  siguen viniendo de lo que importes en Cribado o de mis paquetes.
+
+  Además sugiere todo lo que hayas importado alguna vez al universo
+  del cribado, con su sector y su país. O sea que crece con tu uso.
+
+
+LAS CARTERAS DE PAPEL
+
+  Pestaña «Papel». Una cartera por método que quieras probar, cada
+  una con su nombre, su dinero inicial, la fecha en que empieza y la
+  explicación del método.
+
+  Compras y vendes con dinero imaginario y la tabla de arriba las
+  enfrenta: cuánto vale hoy cada una, cuánto gana, cuánto al año,
+  operaciones, porcentaje de aciertos y posiciones abiertas. La mejor
+  lleva una estrella.
+
+  Mira «Al año», no «Gana»: una cartera de hace tres años y otra de
+  hace dos meses no son comparables en total. Y con menos de veinte
+  operaciones cerradas, el porcentaje de aciertos habla más de la
+  suerte que del método.
+
+  Los precios salen de tus fichas y del cribado; los que falten se
+  ponen a mano en la tabla de posiciones.
+
+  Si gastas más de lo que pusiste, avisa: en la vida real esa compra
+  no habría entrado y la prueba dejaría de valer.
+
+  Cuando un método ya no lo toques, edítalo y márcalo «cerrado»: se
+  queda en la tabla para comparar sin que parezca que sigue vivo.
+
+  NADA de esto toca lo real. Ni los totales de la cartera, ni el
+  rendimiento, ni el informe fiscal. Son dos mundos separados.

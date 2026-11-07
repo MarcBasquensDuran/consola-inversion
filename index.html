@@ -169,6 +169,7 @@ body.hdr-fuera .tabs{top:0}
 .tab[data-tab="datos"]{--tc:var(--g5)}
 .tab[data-tab="operaciones"]{--tc:var(--g2)}
 .tab[data-tab="fiscal"]{--tc:var(--g6)}
+.tab[data-tab="papel"]{--tc:var(--g4)}
 .tab[data-tab="ajustes"]{--tc:var(--c-muted)}
 .tab::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--tc,var(--c-muted));
   display:inline-block;margin-right:7px;opacity:.38;transition:opacity var(--t)}
@@ -242,6 +243,9 @@ td input,td select{padding:4px 7px;font-size:12.5px}
 .pill.revisar{background:var(--v-revisar-bg);color:var(--v-revisar);border-color:var(--v-revisar-bd)}
 .pill.mantener{background:var(--v-mantener-bg);color:var(--v-mantener);border-color:var(--v-mantener-bd)}
 .pill.neutro{background:var(--c-surface-2);color:var(--c-ink-soft);border-color:var(--c-border-strong)}
+.pill.comprar{background:var(--v-mantener-bg);color:var(--v-mantener);border-color:var(--v-mantener-bd)}
+tr.sel td{background:var(--c-accent-soft)}
+.corona{font-style:normal;color:var(--g4,#c9a227)}
 .pill.tipo{background:var(--c-accent-soft);color:var(--c-accent);border-color:transparent;font-weight:560}
 /* Un color por clase de activo, para leer la tabla de un vistazo */
 .pill.t-accion{background:var(--tp-accion-b);color:var(--tp-accion)}
@@ -437,6 +441,33 @@ td.sc{text-align:right;font-variant-numeric:tabular-nums;font-weight:620;
 td.sc.no{background:color-mix(in srgb, var(--v-vender) calc((1 - var(--sc, 0)) * 16%), transparent);
   font-weight:440;color:var(--c-muted)}
 td.sc.inc{background:color-mix(in srgb, var(--v-revisar) calc(var(--sc, 0) * 40%), transparent);font-weight:560}
+/* Degradado de la lista de vigilancia: por posición, o por nota si hay
+   estrategias puestas. --vs va de 0 (abajo) a 1 (arriba). */
+tr.vg td{background:color-mix(in srgb, var(--v-mantener) calc(var(--vs, 0) * 26%), transparent)}
+tr.vg.por-nota td{background:color-mix(in srgb, var(--v-mantener) calc(var(--vs, 0) * 34%), transparent)}
+tr.vg.falla td{background:color-mix(in srgb, var(--v-vender) calc((1 - var(--vs, 0)) * 13%), transparent)}
+.megusta{display:flex;align-items:center;gap:3px;justify-content:flex-end}
+.megusta input{width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.megusta button{width:20px;height:22px;padding:0;line-height:1;font-size:11px;flex:none}
+.pesos-caja{border:1px solid var(--c-border);border-radius:var(--r);padding:12px 14px;margin:10px 0 2px;
+  background:var(--c-surface-2)}
+.pesos-caja .fila{display:flex;align-items:center;gap:10px;padding:5px 0}
+.pesos-caja .fila span.nb{flex:1;font-size:12.5px}
+.pesos-caja input[type=range]{flex:1.4;min-width:90px}
+.pesos-caja b{width:34px;text-align:right;font-variant-numeric:tabular-nums;font-size:12.5px}
+/* Buscador del catálogo de valores */
+.buscador{position:relative}
+.sugerencias{position:absolute;left:0;right:0;top:100%;z-index:40;margin-top:4px;display:none;
+  background:var(--c-surface);border:1px solid var(--c-border-strong);border-radius:var(--r);
+  box-shadow:0 10px 28px rgba(0,0,0,.16);max-height:280px;overflow:auto}
+.sug{display:flex;align-items:baseline;gap:9px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--c-border)}
+.sug:last-child{border-bottom:0}
+.sug:hover,.sug.on{background:var(--c-surface-2)}
+.sug b{font-variant-numeric:tabular-nums;min-width:62px;flex:none}
+.sug span{flex:1;font-size:13px}
+.sug em{font-style:normal;font-size:11.5px;color:var(--c-muted);flex:none}
+.sug i.ya{font-style:normal;font-size:11px;color:var(--c-muted);border:1px solid var(--c-border-strong);
+  border-radius:99px;padding:1px 7px;flex:none}
 .leyenda-sc{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--c-muted);margin-top:10px}
 .leyenda-sc .barra-sc{width:120px;height:9px;border-radius:5px;
   background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--v-mantener) 62%, transparent))}
@@ -658,6 +689,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
     <button class="tab" data-tab="seguimiento">Seguimiento <span class="cnt" id="cnt-novedades">0</span></button>
     <button class="tab" data-tab="datos">Histórico</button>
     <button class="tab" data-tab="operaciones">Operaciones</button>
+    <button class="tab" data-tab="papel">Papel</button>
     <button class="tab" data-tab="fiscal">Fiscal</button>
     <button class="tab" data-tab="ajustes">Ajustes</button>
   </div>
@@ -824,6 +856,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
       <div class="card-b tight tbl-wrap">
         <table id="tbl-cartera"></table>
       </div>
+      <div class="card-b no-print" id="cartera-huerfanos" style="padding-top:0"></div>
     </div>
 
     <div class="grid-2">
@@ -838,7 +871,23 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
     </div>
 
     <div class="card">
-      <div class="card-h"><h3>Lista de vigilancia</h3><div class="sub">Candidatas sin posición abierta</div></div>
+      <div class="card-h">
+        <h3>Lista de vigilancia</h3><div class="sub" id="vig-sub">Candidatas sin posición abierta</div>
+        <div class="toolbar">
+          <select id="vig-orden" title="Cómo ordeno la lista">
+            <option value="interes">Por cuánto me gustan</option>
+            <option value="nota">Por nota de las estrategias</option>
+            <option value="margen">Por margen sobre el escenario base</option>
+            <option value="ticker">Por orden alfabético</option>
+          </select>
+          <button class="btn mini" id="vig-pesos-btn" title="Cuánto pesa cada estrategia en la nota">Pesos</button>
+        </div>
+      </div>
+      <div class="card-b" style="padding-bottom:0">
+        <div class="bloque-t" style="margin-top:0">Estrategias · se acumulan</div>
+        <div class="chips" id="vig-chips"></div>
+        <div id="vig-pesos" style="display:none"></div>
+      </div>
       <div class="card-b tight tbl-wrap"><table id="tbl-vigilancia"></table></div>
     </div>
   </section>
@@ -1116,6 +1165,11 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
   </section>
 
   <!-- ══════════════ AJUSTES ══════════════ -->
+  <!-- ══════════════ CARTERAS DE PAPEL ══════════════ -->
+  <section class="panel" data-panel="papel">
+    <div id="papel-zona"></div>
+  </section>
+
   <section class="panel" data-panel="ajustes">
     <div class="card">
       <div class="card-h"><h3>Tus datos en Drive</h3>
@@ -1340,6 +1394,9 @@ function semilla() {
       /* Una sola estrategia encendida de fábrica: dos a la vez, combinadas con
          «deben pasar todas», dejan la tabla vacía en la primera importación */
       minusvaliasPendientes: 0, otrasGanancias: 0, filtrosActivos: ['ft_small'],
+      /* La vigilancia lleva sus propias estrategias y su propio orden: lo que
+         te interesa vigilar no es lo mismo que lo que cribas del universo */
+      vigFiltros: [], vigOrden: 'interes', vigCombi: 'todas', pesosEstrategias: {},
       cabeceraMovil: 'mini',
       cadenciaInforme: 14, ultimoInforme: '2026-08-30', ultimaExportacion: '', benchmarkId: 'ac_iwda',
       fuentes: 'Cuentas anuales, informes semestrales y hechos relevantes de la propia compañía (CNMV o el regulador que corresponda). Presentaciones de resultados para el detalle operativo. Para fondos y ETF, la ficha mensual y el folleto del emisor. Para precios y múltiplos, una única fuente mantenida en el tiempo y anotada en cada toma.'
@@ -2061,6 +2118,28 @@ const Store = (() => {
     d.revisiones = Array.isArray(d.revisiones) ? d.revisiones : [];
     d.noticias = Array.isArray(d.noticias) ? d.noticias : [];
     d.informes = Array.isArray(d.informes) ? d.informes : [];
+    /* Carteras de papel: estructura mínima para que un archivo de antes
+       de esta versión abra sin quejarse */
+    d.papel = Object.assign({ carteras: [], precios: {}, activa: '' }, d.papel || {});
+    if (!Array.isArray(d.papel.carteras)) d.papel.carteras = [];
+    if (!d.papel.precios || Array.isArray(d.papel.precios)) d.papel.precios = {};
+    d.papel.carteras.forEach(c => {
+      c.id = c.id || Util.uid('pc');
+      c.nombre = c.nombre || 'Sin nombre';
+      c.metodo = c.metodo || '';
+      c.creada = c.creada || Util.hoy();
+      c.capital = Util.n(c.capital);
+      c.cerrada = !!c.cerrada;
+      if (!Array.isArray(c.operaciones)) c.operaciones = [];
+      c.operaciones.forEach(o => {
+        o.id = o.id || Util.uid('po');
+        o.ticker = String(o.ticker || '').toUpperCase();
+        o.tipo = o.tipo === 'venta' ? 'venta' : 'compra';
+        o.fecha = o.fecha || Util.hoy();
+        ['titulos', 'precio', 'comision'].forEach(k => { o[k] = Util.n(o[k]); });
+      });
+    });
+
     d.universo = Object.assign({ empresas: [], perfiles: {}, actualizado: '' }, d.universo || {});
     if (!Array.isArray(d.universo.empresas)) d.universo.empresas = [];
     if (!d.universo.perfiles || Array.isArray(d.universo.perfiles)) d.universo.perfiles = {};
@@ -2112,6 +2191,8 @@ const Store = (() => {
       a.id = a.id || Util.uid('ac');
       a.tipo = TIPOS[a.tipo] ? a.tipo : 'accion';
       a.estado = a.estado || 'cartera';
+      /* Cuánto te gusta, de 0 a 10: ordena la lista de vigilancia */
+      a.interes = Math.max(0, Math.min(10, Util.n(a.interes)));
       a.fx = Util.n(a.fx) || 1;
       a.divisa = a.divisa || 'EUR';
       a.tesis = Object.assign({ resumen: '', fecha: '', horizonte: '', hipotesis: [], riesgos: [], catalizadores: [], premortem: '' }, a.tesis || {});
@@ -3977,6 +4058,20 @@ const Vistas = (() => {
       const filas = c.abiertas.slice().sort((x, y) => y.p.valor - x.p.valor);
       $('#cartera-sub').textContent = `${filas.length} posiciones · coste ${Util.eur(c.coste, 0)} · valor ${Util.eur(c.valor, 0)}`;
 
+      /* Un activo marcado «en cartera» pero sin compra registrada no tiene
+         posición, así que no saldría en esta tabla ni en vigilancia: se
+         quedaría invisible. Aquí se ve y se arregla en un clic. */
+      const huerfanos = Store.activos().filter(a => a.estado === 'cartera' && !Calc.posicion(a.id).abierta);
+      const zonaH = $('#cartera-huerfanos');
+      if (zonaH) zonaH.innerHTML = !huerfanos.length ? '' : `
+        <ul class="motivos"><li class="alta"><i class="sev"></i><div>
+          <b>${huerfanos.length === 1 ? 'Un activo en cartera sin compra registrada' : `${huerfanos.length} activos en cartera sin compra registrada`}</b>
+          <p>Sin la compra no hay títulos ni coste, así que no puede salir en la tabla de arriba ni contar en los totales.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+            ${huerfanos.map(a => `<button class="btn mini" data-huerfano="${a.id}">Registrar la compra de ${Util.esc(a.ticker)}</button>`).join('')}
+            ${huerfanos.map(a => `<button class="btn mini" data-avigilancia="${a.id}">Pasar ${Util.esc(a.ticker)} a vigilancia</button>`).join('')}
+          </div></div></li></ul>`;
+
       $('#tbl-cartera').innerHTML = `
         <thead><tr>
           <th>Activo</th><th>Tipo</th><th class="r">Títulos</th><th class="r">Coste medio</th>
@@ -4028,23 +4123,170 @@ const Vistas = (() => {
       tabla('#tbl-sectores', c.sectores, Util.n(Store.ajustes().topeSector));
       tabla('#tbl-tipos', c.tipos, Util.n(Store.ajustes().topeTipo));
 
+      pintarVigilancia();
+    }
+
+    /* ── Lista de vigilancia ─────────────────────────────────────────
+       Ordenada por cuánto te gusta cada una, con degradado por posición.
+       Si pones estrategias encima, el degradado pasa a ser por la nota
+       combinada (suma ponderada, con los pesos editables en «Pesos»). */
+
+    /* Una ficha no tiene los campos del cribado, pero su última toma de
+       indicadores sí: las claves son las mismas, así que se puede evaluar
+       con las mismas estrategias sin traducir nada. */
+    function comoEmpresa(a) {
+      const t = (a.serie || []).slice().sort((x, y) => (y.fecha || '').localeCompare(x.fecha || ''))[0] || {};
+      const e = { ticker: a.ticker, nombre: a.nombre, sector: a.sector, pais: a.pais, mercado: a.mercado };
+      METRICAS.forEach(m => { if (t[m.k] !== undefined && t[m.k] !== '' && t[m.k] !== null) e[m.k] = Util.n(t[m.k]); });
+      /* El precio y los cuatro indicadores de la cotización mandan sobre la toma */
+      if (Util.n(a.cotizacion.precio)) e.precio = Util.n(a.cotizacion.precio);
+      ['per', 'fcfYield', 'divYield'].forEach(k => { if (Util.n(a.cotizacion[k])) e[k] = Util.n(a.cotizacion[k]); });
+      return e;
+    }
+
+    function pesoDe(id) {
+      const p = Store.ajustes().pesosEstrategias || {};
+      return p[id] === undefined ? 1 : Math.max(0, Util.n(p[id]));
+    }
+
+    function pintarVigilancia() {
+      const aj = Store.ajustes();
       const vig = Store.activos().filter(a => a.estado === 'vigilancia');
+      const todas = Store.filtros();
+      const puestas = new Set(aj.vigFiltros || []);
+      const sel = todas.filter(f => puestas.has(f.id));
+      const emps = vig.map(comoEmpresa);
+      const est = Criba.estadisticas(emps);
+
+      /* Nota de cada una: media de las estrategias puestas, ponderada */
+      const datos = vig.map((a, i) => {
+        const e = emps[i];
+        const ev = {}; let suma = 0, pesos = 0, fallan = 0, inc = false;
+        sel.forEach(f => {
+          const r = Criba.evaluar(e, f, est);
+          ev[f.id] = r;
+          const w = pesoDe(f.id);
+          suma += r.score * w; pesos += w;
+          if (r.estado === 'no') fallan++;
+          if (r.estado === 'incompleto') inc = true;
+        });
+        /* Rojo solo si no encaja en NINGUNA: con dos o tres estrategias puestas,
+           fallar alguna es lo normal y teñirlo todo de rojo no dice nada */
+        return { a, e, ev, nota: pesos ? suma / pesos : null,
+          falla: sel.length > 0 && fallan === sel.length, inc, margen: Calc.margen(a) };
+      });
+
+      const orden = aj.vigOrden || 'interes';
+      datos.sort((x, y) => {
+        if (orden === 'nota' && sel.length) return (y.nota || 0) - (x.nota || 0);
+        if (orden === 'margen') return (y.margen === null ? -1e9 : y.margen) - (x.margen === null ? -1e9 : x.margen);
+        if (orden === 'ticker') return (x.a.ticker || '').localeCompare(y.a.ticker || '');
+        return (y.a.interes - x.a.interes) || (x.a.ticker || '').localeCompare(y.a.ticker || '');
+      });
+
+      const porNota = sel.length > 0;
+      $('#vig-sub').textContent = vig.length
+        ? `${vig.length} ${vig.length === 1 ? 'candidata' : 'candidatas'} sin posición abierta` +
+          (porNota ? ` · nota de ${sel.length} ${sel.length === 1 ? 'estrategia' : 'estrategias'}` : ' · ordenadas por cuánto te gustan')
+        : 'Candidatas sin posición abierta';
+
+      /* Chips: cuántas de la lista pasan cada estrategia */
+      /* Aquí el número útil es «cuántas no fallan nada»: en una ficha hecha a
+         mano casi siempre falta algún campo, y contar solo las perfectas
+         dejaría todos los chips a cero */
+      $('#vig-chips').innerHTML = todas.length ? todas.map(f => {
+        const r = emps.map(e => Criba.evaluar(e, f, est).estado);
+        const ok = r.filter(x => x === 'apto').length, salvo = r.filter(x => x === 'incompleto').length;
+        return `<button class="chip ${puestas.has(f.id) ? 'on' : ''}" data-vft="${f.id}"
+          style="--col:${f.color || 'var(--c-accent)'}"
+          title="${ok} la cumplen entera${salvo ? ` y ${salvo} no fallan nada pero les faltan datos` : ''}">
+          <i style="background:${f.color || 'var(--c-accent)'}"></i>
+          <span>${Util.esc(f.nombre)}</span><span class="n">${ok + salvo}</span></button>`;
+      }).join('') : `<p class="small mut">Sin estrategias todavía. Se crean en Cribado o te las preparo en un paquete.</p>`;
+
+      /* Submenú de pesos: oculto, pero a un clic */
+      $('#vig-pesos').innerHTML = !sel.length ? '' : `
+        <div class="pesos-caja">
+          <b style="display:block;margin-bottom:6px;width:auto;text-align:left">Cuánto pesa cada estrategia en la nota</b>
+          ${sel.map(f => `<div class="fila">
+            <span class="nb">${Util.esc(f.nombre)}</span>
+            <input type="range" min="0" max="3" step="0.25" value="${pesoDe(f.id)}" data-vpeso="${f.id}">
+            <b data-vpesov="${f.id}">×${Util.num(pesoDe(f.id), 2)}</b>
+          </div>`).join('')}
+          <p class="small mut" style="margin:8px 0 0">A cero, la estrategia sigue filtrando pero no cuenta para la nota.</p>
+        </div>`;
+
+      const col = porNota ? 8 : 7;
       $('#tbl-vigilancia').innerHTML = `
-        <thead><tr><th>Activo</th><th>Tipo</th><th class="r">Precio</th><th class="r">Base</th>
-        <th class="r">Margen</th><th>Qué espero</th><th class="no-print"></th></tr></thead>
-        <tbody>${vig.length ? vig.map(a => {
-          const m = Calc.margen(a);
-          return `<tr>
+        <thead><tr><th>Activo</th><th>Tipo</th><th class="r">Me gusta</th><th class="r">Precio</th>
+        <th class="r">Base</th><th class="r">Margen</th>${porNota ? '<th class="r">Nota</th>' : ''}
+        <th>Qué espero</th><th class="no-print"></th></tr></thead>
+        <tbody>${datos.length ? datos.map((d, i) => {
+          const a = d.a, m = d.margen;
+          /* El degradado: por posición si no hay estrategias, por nota si las hay */
+          const vs = porNota ? Math.max(0, Math.min(1, (d.nota || 0) / 100))
+            : (datos.length > 1 ? (datos.length - 1 - i) / (datos.length - 1) : 1);
+          return `<tr class="vg ${porNota ? 'por-nota' : ''} ${porNota && d.falla ? 'falla' : ''}" style="--vs:${vs.toFixed(3)}">
             <td class="tick">${Util.esc(a.ticker)}<small>${Util.esc(a.nombre)}</small></td>
             <td><span class="pill tipo t-${a.tipo}">${TIPOS[a.tipo]}</span></td>
+            <td class="r"><div class="megusta">
+              <button class="btn mini" data-vmenos="${a.id}" title="Menos">−</button>
+              <input type="number" min="0" max="10" step="1" value="${Util.n(a.interes)}" data-vint="${a.id}">
+              <button class="btn mini" data-vmas="${a.id}" title="Más">+</button></div></td>
             <td class="r num">${Util.num(a.cotizacion.precio)}</td>
             <td class="r num">${Util.num(a.valoracion.base.precio)}</td>
             <td class="r num ${m !== null && m > 0 ? 'pos' : ''}">${m === null ? '—' : Util.signo(m, 0) + ' %'}</td>
+            ${porNota ? `<td class="r num" title="${Util.esc(sel.map(f => `${f.nombre}: ${Util.num(d.ev[f.id].score, 0)}`).join(' · '))}">
+              ${Util.num(d.nota, 0)}${d.falla ? '<small class="neg">falla</small>' : d.inc ? '<small class="mut">incompleta</small>' : ''}</td>` : ''}
             <td class="small soft">${Util.esc((a.tesis.hipotesis[0] || {}).texto || a.valoracion.notas || '—')}</td>
             <td class="no-print nowrap"><button class="btn mini" data-ficha2="${a.id}">Ficha</button>
-              <button class="btn mini" data-sim2="${a.id}">Vender</button></td>
+              <button class="btn mini" data-comprar="${a.id}">Comprar</button>
+              <button class="btn mini" data-quitarvig="${a.id}">Quitar</button></td>
           </tr>`;
-        }).join('') : `<tr><td colspan="7" class="vacio">Nada en vigilancia todavía.</td></tr>`}</tbody>`;
+        }).join('') : `<tr><td colspan="${col + 1}" class="vacio"><b>Nada en vigilancia todavía</b>Añade un activo y déjalo «en vigilancia», o pásalo desde el cribado.</td></tr>`}</tbody>`;
+
+      /* ── Controles ── */
+      const sel0 = $('#vig-orden');
+      if (sel0) {
+        /* Sin estrategias puestas no hay nota por la que ordenar */
+        const opNota = sel0.querySelector('[value="nota"]');
+        if (opNota) { opNota.disabled = !sel.length; opNota.textContent = sel.length ? 'Por nota de las estrategias' : 'Por nota (pon antes una estrategia)'; }
+        sel0.value = orden === 'nota' && !sel.length ? 'interes' : orden;
+        sel0.onchange = () => { aj.vigOrden = sel0.value; Store.guardar(); pintarVigilancia(); };
+      }
+      const bp = $('#vig-pesos-btn');
+      if (bp) bp.onclick = () => {
+        const z = $('#vig-pesos');
+        if (!sel.length) { Util.toast('Pon alguna estrategia y podrás darle peso', 'err'); return; }
+        z.style.display = z.style.display === 'none' ? '' : 'none';
+      };
+      $$('[data-vft]').forEach(c => c.onclick = () => {
+        const id = c.dataset.vft, s = new Set(aj.vigFiltros || []);
+        s.has(id) ? s.delete(id) : s.add(id);
+        aj.vigFiltros = [...s]; Store.guardar(); pintarVigilancia();
+      });
+      $$('[data-vpeso]').forEach(r => {
+        const pon = () => {
+          aj.pesosEstrategias = aj.pesosEstrategias || {};
+          aj.pesosEstrategias[r.dataset.vpeso] = Util.n(r.value);
+          const et = $(`[data-vpesov="${r.dataset.vpeso}"]`); if (et) et.textContent = '×' + Util.num(Util.n(r.value), 2);
+        };
+        r.oninput = pon;
+        r.onchange = () => { pon(); Store.guardar(); const abierto = $('#vig-pesos').style.display; pintarVigilancia(); $('#vig-pesos').style.display = abierto; };
+      });
+      const tocaInteres = (id, v) => {
+        const a = Store.activo(id);
+        const antes = a.interes;
+        a.interes = Math.max(0, Math.min(10, Util.n(v)));
+        if (a.interes !== antes) { Store.log(a, 'Me gusta', antes, a.interes); Store.guardar(); }
+        pintarVigilancia();
+      };
+      $$('[data-vint]').forEach(i => i.onchange = () => tocaInteres(i.dataset.vint, i.value));
+      $$('[data-vmas]').forEach(b => b.onclick = () => tocaInteres(b.dataset.vmas, Util.n(Store.activo(b.dataset.vmas).interes) + 1));
+      $$('[data-vmenos]').forEach(b => b.onclick = () => tocaInteres(b.dataset.vmenos, Util.n(Store.activo(b.dataset.vmenos).interes) - 1));
+      $$('#tbl-vigilancia [data-ficha2]').forEach(b => b.onclick = () => Ficha.abrir(b.dataset.ficha2));
+      $$('#tbl-vigilancia [data-comprar]').forEach(b => b.onclick = () => Ops.nueva(b.dataset.comprar, 'compra'));
+      $$('#tbl-vigilancia [data-quitarvig]').forEach(b => b.onclick = () => quitarDeVigilancia(b.dataset.quitarvig));
 
       $$('[data-precio]').forEach(i => i.onchange = () => {
         const a = Store.activo(i.dataset.precio);
@@ -4055,6 +4297,46 @@ const Vistas = (() => {
       });
       $$('[data-ficha2]').forEach(b => b.onclick = () => Ficha.abrir(b.dataset.ficha2));
       $$('[data-sim2]').forEach(b => b.onclick = () => Sim.abrir(b.dataset.sim2));
+      $$('[data-comprar]').forEach(b => b.onclick = () => Ops.nueva(b.dataset.comprar, 'compra'));
+      $$('[data-huerfano]').forEach(b => b.onclick = () => Ops.nueva(b.dataset.huerfano, 'compra'));
+      $$('[data-avigilancia]').forEach(b => b.onclick = () => {
+        const a = Store.activo(b.dataset.avigilancia);
+        Store.marcar(`${a.ticker} a vigilancia`);
+        Store.log(a, 'Estado', 'cartera', 'vigilancia');
+        a.estado = 'vigilancia';
+        Store.save(); Util.toast(`${a.ticker} pasa a vigilancia`);
+      });
+    }
+
+    /* Quitar de vigilancia: se borra la ficha entera, así que aviso de lo que
+       se lleva por delante y lo dejo deshacible */
+    function quitarDeVigilancia(id) {
+        const a = Store.activo(id);
+        const ops = Store.ops().filter(o => o.activoId === a.id).length;
+        const cosas = [
+          (a.tesis.hipotesis || []).length && `${a.tesis.hipotesis.length} hipótesis`,
+          (a.serie || []).length && `${a.serie.length} tomas de indicadores`,
+          (a.noticias || []).length && `${a.noticias.length} novedades`,
+          (a.estudios || []).length && `${a.estudios.length} estudios`,
+          ops && `${ops} operaciones`
+        ].filter(Boolean);
+        Modal.abrir({
+          titulo: `Quitar ${a.ticker} de vigilancia`,
+          cuerpo: `<p>Deja de seguir <b>${Util.esc(a.nombre)}</b> y borra su ficha.</p>
+            ${cosas.length ? `<ul class="motivos" style="margin-top:12px"><li class="alta"><i class="sev"></i><div>
+              <b>Se lleva por delante lo que tienes apuntado</b>
+              <p>${cosas.join(', ')}.</p></div></li></ul>` : ''}
+            <p class="small mut" style="margin-top:12px">Se puede deshacer desde el aviso de arriba justo después.</p>`,
+          pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn pri" id="qv-ok">Quitar de vigilancia</button>`,
+          alAbrir: () => $('#qv-ok').onclick = () => {
+            Store.marcar(`Quitar ${a.ticker} de vigilancia`);
+            const acts = Store.activos();
+            acts.splice(acts.findIndex(x => x.id === a.id), 1);
+            const ops2 = Store.ops();
+            for (let i = ops2.length - 1; i >= 0; i--) if (ops2[i].activoId === a.id) ops2.splice(i, 1);
+            Store.save(); Modal.cerrar(); Util.toast(`${a.ticker} fuera de la lista`);
+          }
+        });
     }
     return { render };
   })();
@@ -5647,6 +5929,7 @@ const Vistas = (() => {
     OpsV.render();
     FiscalV.render();
     AjustesV.render();
+    if (typeof Papel !== 'undefined') Papel.render();
   }
   return { refrescar, Semaforo, PanelV, RendV, CribaV, ManualV, CarteraV, FilosofiaV, SeguimientoV, DatosV, OpsV, FiscalV, AjustesV };
 })();
@@ -5656,7 +5939,9 @@ const Vistas = (() => {
 <script src="./fusion.js"></script>
 <script src="./nube.js"></script>
 <script src="./agenda.js"></script>
+<script src="./catalogo.js"></script>
 <script src="./estudio.js"></script>
+<script src="./papel.js"></script>
 <script>
 /* ═══════════════ FICHA DEL ACTIVO ═══════════════ */
 const Ficha = (() => {
@@ -6020,7 +6305,14 @@ const Ficha = (() => {
   function nuevoActivo() {
     Modal.abrir({
       titulo: 'Añadir activo',
-      cuerpo: `<div class="form-grid">
+      cuerpo: `<div class="field buscador">
+          <label>Buscar la empresa, el ETF o el fondo</label>
+          <input id="na-buscar" placeholder="Escribe el nombre o el ticker: telefonica, IWDA, Cobas…" autocomplete="off">
+          <div id="na-sug" class="sugerencias"></div>
+          <p class="small mut" style="margin:6px 0 0">Rellena el ticker, el nombre y el tipo.
+          Los datos (precio, PER…) no vienen de aquí: salen de lo que importes en Cribado o de un paquete.</p>
+        </div>
+        <div class="form-grid" style="margin-top:14px">
           <div class="field"><label>Ticker</label><input id="na-tk" placeholder="TAR"></div>
           <div class="field"><label>Nombre</label><input id="na-nb" placeholder="Talleres Aranda"></div>
           <div class="field"><label>Tipo</label><select id="na-tp">${Object.entries(TIPOS).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></div>
@@ -6031,12 +6323,81 @@ const Ficha = (() => {
           <div class="field"><label>Escenario base (€)</label><input type="number" step="any" id="na-bs"></div>
           <div class="field"><label>Estado</label><select id="na-es"><option value="vigilancia">En vigilancia</option><option value="cartera">En cartera</option></select></div>
         </div>
+        <div id="na-compra" style="display:none">
+          <div class="bloque-t">La compra</div>
+          <p class="small mut" style="margin:-4px 0 10px">Sin compra registrada no hay posición, y entonces no puede
+          aparecer en la cartera ni calcularse nada. Si todavía no la has comprado, déjalo en vigilancia.</p>
+          <div class="form-grid">
+            <div class="field"><label>Títulos</label><input type="number" step="any" id="na-ti"></div>
+            <div class="field"><label>Precio de compra</label><input type="number" step="any" id="na-pc"></div>
+            <div class="field"><label>Fecha</label><input type="date" id="na-fe" value="${Util.hoy()}"></div>
+            <div class="field"><label>Comisión</label><input type="number" step="any" id="na-co" value="0"></div>
+          </div>
+        </div>
         <div class="field" style="margin-top:12px"><label>Tesis: por qué te interesa</label>
           <textarea id="na-ts" placeholder="En dos o tres frases, qué ves tú que no ve el mercado"></textarea></div>`,
       pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn pri" id="na-ok">Añadir activo</button>`,
-      alAbrir: () => $('#na-ok').onclick = () => {
+      alAbrir: () => {
+        /* Buscador del catálogo: rellena los campos de identidad al elegir */
+        const caja = $('#na-buscar'), lista = $('#na-sug');
+        let sug = [], marcado = -1;
+        const pintar = () => {
+          lista.innerHTML = !sug.length ? '' : sug.map((x, i) => `
+            <div class="sug ${i === marcado ? 'on' : ''}" data-sug="${i}">
+              <b>${Util.esc(x.ticker)}</b>
+              <span>${Util.esc(x.nombre)}</span>
+              <em>${TIPOS[x.tipo] || x.tipo}${x.mercado ? ' · ' + Util.esc(x.mercado) : ''}${x.origen === 'cribado' ? ' · del cribado' : ''}</em>
+              ${x.tengo ? '<i class="ya">ya la tienes</i>' : ''}
+            </div>`).join('');
+          lista.style.display = sug.length ? '' : 'none';
+          $$('[data-sug]').forEach(d => d.onclick = () => elegir(sug[+d.dataset.sug]));
+        };
+        const elegir = x => {
+          if (!x) return;
+          if (x.tengo) { Util.toast(`${x.ticker} ya está en tu lista`, 'err'); return; }
+          $('#na-tk').value = x.ticker;
+          $('#na-nb').value = x.nombre;
+          $('#na-tp').value = x.tipo;
+          if (x.sector) $('#na-sc').value = x.sector;
+          if (x.pais) $('#na-pa').value = x.pais;
+          caja.value = `${x.ticker} · ${x.nombre}`;
+          sug = []; marcado = -1; pintar();
+          $('#na-pr').focus();
+        };
+        caja.oninput = () => { sug = VALORES.buscar(caja.value, 8); marcado = -1; pintar(); };
+        caja.onkeydown = e => {
+          if (!sug.length) return;
+          if (e.key === 'ArrowDown') { marcado = Math.min(sug.length - 1, marcado + 1); pintar(); e.preventDefault(); }
+          else if (e.key === 'ArrowUp') { marcado = Math.max(0, marcado - 1); pintar(); e.preventDefault(); }
+          else if (e.key === 'Enter') { elegir(sug[marcado < 0 ? 0 : marcado]); e.preventDefault(); }
+          else if (e.key === 'Escape') { sug = []; pintar(); }
+        };
+        /* Los campos de la compra solo cuando dice que ya la tiene */
+        const vista = () => {
+          const cartera = $('#na-es').value === 'cartera';
+          $('#na-compra').style.display = cartera ? '' : 'none';
+          if (cartera && !$('#na-pc').value) $('#na-pc').value = $('#na-pr').value;
+        };
+        $('#na-es').onchange = vista;
+        $('#na-pr').onchange = () => { if (!$('#na-pc').value) $('#na-pc').value = $('#na-pr').value; };
+        vista();
+        $('#na-ok').onclick = () => {
         const tk = $('#na-tk').value.trim().toUpperCase();
         if (!tk) { Util.toast('Hace falta al menos un ticker', 'err'); return; }
+        /* Un mismo ticker dos veces parte el histórico en dos fichas */
+        const ya = Store.activos().find(x => (x.ticker || '').toUpperCase() === tk);
+        if (ya) {
+          Modal.cerrar();
+          Util.toast(`${tk} ya lo tienes: te abro su ficha`, 'err');
+          setTimeout(() => Ficha.abrir(ya.id), 260);
+          return;
+        }
+        const enCartera = $('#na-es').value === 'cartera';
+        const tit = Util.n($('#na-ti').value);
+        if (enCartera && tit <= 0) {
+          Util.toast('Pon cuántos títulos compraste, o déjalo en vigilancia', 'err');
+          $('#na-ti').focus(); return;
+        }
         const base = Util.n($('#na-bs').value);
         Store.activos().push(Store.normalizar({
           activos: [{
@@ -6050,7 +6411,18 @@ const Ficha = (() => {
             checklist: { fecha: '', respuestas: {} }, notas: '', historial: []
           }]
         }).activos[0]);
-        Store.save(); Modal.cerrar(); Util.toast(tk + ' añadido');
+        const nuevo = Store.activos()[Store.activos().length - 1];
+        if (enCartera) {
+          Store.ops().push({
+            id: Util.uid('op'), activoId: nuevo.id, tipo: 'compra',
+            fecha: $('#na-fe').value || Util.hoy(), titulos: tit,
+            precio: Util.n($('#na-pc').value) || Util.n($('#na-pr').value),
+            comision: Util.n($('#na-co').value), importe: 0, retencion: 0, nota: 'Alta del activo'
+          });
+        }
+        Store.save(); Modal.cerrar();
+        Util.toast(enCartera ? `${tk} añadido con ${Util.num(tit, 0)} títulos` : `${tk} añadido a vigilancia`);
+        }
       }
     });
   }
