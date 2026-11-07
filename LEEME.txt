@@ -43,3 +43,47 @@ TUS DATOS
   Mientras no esté lista la fase 2 (Drive), el móvil y el ordenador
   tienen datos separados. Para pasar de uno a otro, el mismo camino:
   guardar archivo en uno y abrirlo en el otro.
+
+
+==============================================================
+FASE 2 · TUS DATOS EN DRIVE
+==============================================================
+
+ARCHIVOS NUEVOS
+
+  config.js    TUYO. Aquí va tu identificador de Google.
+               NO lo sustituyas nunca al actualizar el programa.
+  fusion.js    Junta los cambios de dos aparatos sin perder nada.
+  nube.js      Inicio de sesión con Google y sincronización.
+
+  Al actualizar sustituyes index.html, fusion.js, nube.js y sw.js
+  (con su número de VERSIÓN subido). config.js se queda como está.
+
+
+QUÉ HACE
+
+  Guarda un único archivo consola-inversion.json en una carpeta
+  «Consola de inversión» de tu Drive, y una copia con fecha al día
+  (conserva las diez últimas).
+
+  El permiso que pide es drive.file: la app solo ve los archivos que
+  ella misma crea. No puede ver el resto de tu Drive.
+
+  Sincroniza al abrirla, al volver a ella, cada diez minutos y cuando
+  pulsas «Sincronizar ahora». Si no hay conexión, sigue funcionando y
+  sincroniza cuando vuelva.
+
+
+LA PRIMERA VEZ EN CADA APARATO
+
+  Si en Drive ya hay datos y en el aparato también, NO decide por su
+  cuenta: te enseña una tabla con lo que hay a cada lado y eliges entre
+  quedarte con lo de Drive, juntar los dos o subir lo de este aparato.
+  Lo que elijas se puede deshacer desde el aviso de arriba.
+
+
+SI ALGO VA MAL
+
+  Tus datos nunca dependen solo de Drive: «Ajustes > Guardar archivo»
+  sigue funcionando y es tu salvavidas. Si la sincronización falla, el
+  programa sigue guardando en el aparato como siempre.

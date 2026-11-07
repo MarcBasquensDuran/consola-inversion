@@ -17,6 +17,11 @@
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#181d1d" media="(prefers-color-scheme: dark)">
 <meta name="description" content="Filosofía de inversión, cartera, histórico de indicadores y señales de venta.">
+
+<!-- Tu identificador de Google. Este archivo no se sustituye al actualizar. -->
+<script src="./config.js"></script>
+<!-- Inicio de sesión de Google. Si no hay conexión, el programa funciona igual. -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 /* ============================================================
    CONSOLA DE INVERSIÓN v1 — Tokens
@@ -358,6 +363,17 @@ td input,td select{padding:4px 7px;font-size:12.5px}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.err{background:var(--v-vender)}
 
+/* ---------- Indicador de sincronización ---------- */
+.nube{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;
+  border:1px solid var(--c-border-strong);background:var(--c-surface);cursor:pointer;
+  font-size:12px;color:var(--c-ink-soft);font-family:inherit}
+.nube:hover{background:var(--c-surface-2)}
+.nube i{width:8px;height:8px;border-radius:50%;flex:none;background:var(--c-muted)}
+.nube.ok i{background:var(--v-mantener)}
+.nube.error i{background:var(--v-vender)}
+.nube.sincronizando i{background:var(--v-revisar);animation:lat 1.1s ease-in-out infinite}
+@keyframes lat{0%,100%{opacity:1}50%{opacity:.25}}
+
 /* ---------- Selector de opciones ---------- */
 .opciones{display:grid;gap:8px}
 .opcion{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;width:100%;text-align:left;
@@ -502,6 +518,8 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
   .hdr-actions{order:2;gap:5px;flex:none}
   .hdr-actions .btn{padding:6px 10px;font-size:12px}
   .hdr-actions .btn:not(.pri){display:none}  /* están en Ajustes > Pantalla */
+  .nube span{display:none}
+  .nube{padding:7px 9px}
   h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .brand-txt{min-width:0}
   .hdr-metrics{order:3;width:100%;margin-left:0;display:grid;
@@ -596,6 +614,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
     </div>
     <div class="hdr-metrics" id="hdr-metrics"></div>
     <div class="hdr-actions no-print">
+      <button class="nube off" id="nube-estado" title="Estado de la sincronización"><i></i><span>Solo en este aparato</span></button>
       <button class="btn" id="btn-tema" title="Cambiar entre claro y oscuro">Oscuro</button>
       <button class="btn" onclick="window.print()">Imprimir</button>
       <button class="btn pri" id="btn-guardar-arch">Guardar copia</button>
@@ -1073,6 +1092,12 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
 
   <!-- ══════════════ AJUSTES ══════════════ -->
   <section class="panel" data-panel="ajustes">
+    <div class="card">
+      <div class="card-h"><h3>Tus datos en Drive</h3>
+        <div class="sub">Para tenerlos en el móvil y en el ordenador</div></div>
+      <div class="card-b" id="dr-cuerpo"></div>
+    </div>
+
     <div class="card">
       <div class="card-h"><h3>Pantalla</h3>
         <div class="sub">Cómo se comporta el programa en el móvil</div></div>
@@ -2101,6 +2126,10 @@ const Store = (() => {
     return state;
   }
   function guardar() {
+    /* Cuándo se guardó por última vez en este aparato. Lo usa la
+       sincronización para desempatar si los dos cambiaron lo mismo. */
+    state.meta = state.meta || {};
+    state.meta.guardado = Date.now();
     try { localStorage.setItem(KEY, JSON.stringify(state)); return true; }
     catch (e) { Util.toast('No se ha podido guardar: no queda espacio en el navegador', 'err'); return false; }
   }
@@ -4995,6 +5024,7 @@ const Vistas = (() => {
       const un = Store.hayDeshacer();
       $('#uso-undo').textContent = un ? un.desc : 'nada pendiente';
       if (typeof Pantalla !== 'undefined') Pantalla.selector();
+      if (typeof Nube !== 'undefined') { Nube.pintarAjustes(); Nube.refrescarIndicador(); }
       $('#uso-bytes').textContent = Util.bytes(e.datos + e.copias);
       const cs = Store.copias();
       $('#uso-copia').textContent = cs.length ? new Date(cs[0].ts).toLocaleString('es-ES') : '—';
@@ -5441,6 +5471,8 @@ const Vistas = (() => {
 </script>
 
 
+<script src="./fusion.js"></script>
+<script src="./nube.js"></script>
 <script>
 /* ═══════════════ FICHA DEL ACTIVO ═══════════════ */
 const Ficha = (() => {
@@ -6591,6 +6623,15 @@ const App = (() => {
   $('#btn-tema').onclick = cambiarTema;
   $('#btn-tema2').onclick = cambiarTema;
   $('#btn-tema2').textContent = (aj.tema === 'dark') ? 'Cambiar a claro' : 'Cambiar a oscuro';
+  $('#nube-estado').onclick = () => {
+    $$('.tab').forEach(x => x.classList.remove('on'));
+    $$('.panel').forEach(x => x.classList.remove('on'));
+    $('[data-tab="ajustes"]').classList.add('on');
+    $('[data-panel="ajustes"]').classList.add('on');
+    Pantalla.alCambiarPestana();
+    const c = $('#dr-cuerpo');
+    if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
   $('#btn-guardar-arch').onclick = Datos.exportar;
   $('#btn-exportar').onclick = Datos.exportar;
   $('#btn-importar').onclick = Datos.importar;
@@ -6663,6 +6704,7 @@ const App = (() => {
   Vistas.refrescar();
   Pantalla.init();
   App.init();
+  if (typeof Nube !== 'undefined') Nube.init();
   Store.autocopia(true);
   setInterval(() => Store.autocopia(), 300000);
 })();
