@@ -862,7 +862,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
           <div class="field" style="min-width:190px"><label for="cb-modo">Qué enseño</label>
             <select id="cb-modo">
               <option value="aptas">Solo las que pasan</option>
-              <option value="casi">Las que pasan y las incompletas</option>
+              <option value="casi" selected>Las que pasan y las incompletas</option>
               <option value="todas">Todas, ordenadas por nota</option>
             </select></div>
           <div class="field" style="min-width:170px"><label for="cb-combi">Al combinar varias</label>
@@ -1337,7 +1337,9 @@ function semilla() {
     ajustes: {
       topePosicion: 12, topeSector: 30, topeTipo: 40, topeCripto: 5,
       graciaRevision: 15, tema: 'light',
-      minusvaliasPendientes: 0, otrasGanancias: 0, filtrosActivos: ['ft_small', 'ft_buffett'],
+      /* Una sola estrategia encendida de fábrica: dos a la vez, combinadas con
+         «deben pasar todas», dejan la tabla vacía en la primera importación */
+      minusvaliasPendientes: 0, otrasGanancias: 0, filtrosActivos: ['ft_small'],
       cabeceraMovil: 'mini',
       cadenciaInforme: 14, ultimoInforme: '2026-08-30', ultimaExportacion: '', benchmarkId: 'ac_iwda',
       fuentes: 'Cuentas anuales, informes semestrales y hechos relevantes de la propia compañía (CNMV o el regulador que corresponda). Presentaciones de resultados para el detalle operativo. Para fondos y ETF, la ficha mensual y el folleto del emisor. Para precios y múltiplos, una única fuente mantenida en el tiempo y anotada en cada toma.'
@@ -2596,13 +2598,16 @@ const Calc = (() => {
     const p = posicion(activoId);
     const lot = lotes(activoId);
     let quedan = titulos, coste = 0;
-    const consumidos = [];
+    const consumidos = [], sobran = [];
     lot.forEach(l => {
-      if (quedan <= 0.0000001) return;
-      const usa = Math.min(l.titulos, quedan), parte = usa / l.titulos;
-      const c = usa * l.precio + l.comision * parte;
-      consumidos.push({ fecha: l.fecha, titulos: usa, precio: l.precio, coste: c });
-      coste += c; quedan -= usa;
+      const usa = Math.min(l.titulos, Math.max(0, quedan));
+      if (usa > 0.0000001) {
+        const parte = usa / l.titulos;
+        const c = usa * l.precio + l.comision * parte;
+        consumidos.push({ fecha: l.fecha, titulos: usa, precio: l.precio, coste: c });
+        coste += c; quedan -= usa;
+      }
+      if (l.titulos - usa > 0.0000001) sobran.push({ fecha: l.fecha, titulos: l.titulos - usa });
     });
     const bruto = titulos * precio;
     const neto = bruto - comision;
@@ -2624,11 +2629,19 @@ const Calc = (() => {
       a, p, titulos, precio, comision, bruto, neto, coste, ganancia, consumidos,
       impuesto, liquidez: neto - Math.max(0, impuesto),
       titulosRestantes, cierraPosicion: titulosRestantes <= 0.0000001,
+      /* Compras de los dos últimos meses que, tras esta venta, SEGUIRÍAN en cartera:
+         son las que aparcan la pérdida. Si la venta cierra la posición entera, la
+         compra que la creó no bloquea nada, porque no te queda el valor en la mano. */
       comprasRecientes: (() => {
         const ini = new Date(); ini.setMonth(ini.getMonth() - 2);
+        const desde = ini.toISOString().slice(0, 10);
         return Store.ops().filter(o => o.activoId === activoId && o.tipo === 'compra' &&
-          o.fecha >= ini.toISOString().slice(0, 10));
+          o.fecha >= desde && sobran.some(s => s.fecha === o.fecha));
       })(),
+      titulosAparcados: sobran.filter(s => {
+        const ini = new Date(); ini.setMonth(ini.getMonth() - 2);
+        return s.fecha >= ini.toISOString().slice(0, 10);
+      }).reduce((s, x) => s + x.titulos, 0),
       pesoAntes: c.pesoDe(activoId),
       pesoDespues: carteraDespues > 0 ? valorDespues / carteraDespues * 100 : 0,
       recompra: ganancia < 0
@@ -2658,19 +2671,43 @@ const Calc = (() => {
         }
         const importe = o.titulos * o.precio - o.comision;
         const resultado = importe - coste;
-        /* Regla de los dos meses: una pérdida no se puede compensar si has
-           recomprado el mismo valor dentro de los dos meses anteriores o posteriores. */
-        let bloqueo = [];
+        /* Regla de los dos meses. Lo que la ley impide compensar no es vender con
+           pérdidas, sino quedarse con el valor en la mano: la pérdida no computa en
+           la medida en que sigues teniendo títulos homogéneos comprados dentro de los
+           dos meses anteriores o posteriores. Por eso NO cuenta la compra que creó la
+           posición si la venta la cierra del todo: ahí no queda nada que recomprar.
+           Y cuando solo parte de los títulos quedan en cartera, solo esa parte
+           proporcional de la pérdida queda aparcada. */
+        let bloqueo = [], parteBloqueada = 0;
         if (resultado < 0) {
           const ini = new Date(o.fecha + 'T00:00:00'); ini.setMonth(ini.getMonth() - 2);
           const fin = new Date(o.fecha + 'T00:00:00'); fin.setMonth(fin.getMonth() + 2);
-          bloqueo = ops.filter(x => x.activoId === o.activoId && x.tipo === 'compra' &&
-            x.fecha >= ini.toISOString().slice(0, 10) && x.fecha <= fin.toISOString().slice(0, 10));
+          const desde = ini.toISOString().slice(0, 10), hasta = fin.toISOString().slice(0, 10);
+          const enVentana = f => f >= desde && f <= hasta;
+
+          /* Títulos que siguen en cartera tras esta venta y entraron dentro de la ventana */
+          const vivos = lot.filter(l => enVentana(l.fecha) && l.titulos > 0.0000001);
+          const quedanVentana = vivos.reduce((s, l) => s + l.titulos, 0);
+          /* Recompras posteriores: en este punto de la película todavía no son lotes */
+          const recompras = ops.filter(x => x.activoId === o.activoId && x.tipo === 'compra' &&
+            x.fecha > o.fecha && x.fecha <= hasta);
+          const recompradas = recompras.reduce((s, x) => s + x.titulos, 0);
+
+          const afectados = Math.min(o.titulos, quedanVentana + recompradas);
+          parteBloqueada = o.titulos > 0 ? afectados / o.titulos : 0;
+          if (parteBloqueada > 0.0000001) {
+            const previas = ops.filter(x => x.activoId === o.activoId && x.tipo === 'compra' &&
+              x.fecha <= o.fecha && enVentana(x.fecha) &&
+              vivos.some(l => l.fecha === x.fecha));
+            bloqueo = [...previas, ...recompras];
+          }
         }
+        const resultadoBloqueado = resultado * parteBloqueada;
         ventas.push({
           op: o, activoId: o.activoId, fecha: o.fecha, titulos: o.titulos, precio: o.precio,
           importe, coste, resultado, consumidos, ano: (o.fecha || '').slice(0, 4),
-          bloqueada: bloqueo.length > 0, bloqueo
+          bloqueada: parteBloqueada > 0.0000001, parcial: parteBloqueada > 0.0000001 && parteBloqueada < 0.9999999,
+          parteBloqueada, resultadoBloqueado, computable: resultado - resultadoBloqueado, bloqueo
         });
       }
     });
@@ -2696,10 +2733,10 @@ const Calc = (() => {
       bolsa = bolsa.filter(b => b.caduca >= y);
 
       const ventas = todas.filter(v => v.ano === a);
-      const computables = ventas.filter(v => !v.bloqueada);
-      const ganancias = computables.filter(v => v.resultado > 0).reduce((s, v) => s + v.resultado, 0);
-      const perdidas = computables.filter(v => v.resultado < 0).reduce((s, v) => s + v.resultado, 0);
-      const bloqueadas = ventas.filter(v => v.bloqueada).reduce((s, v) => s + v.resultado, 0);
+      /* Una ganancia nunca se bloquea; de una pérdida puede computar solo una parte */
+      const ganancias = ventas.filter(v => v.resultado > 0).reduce((s, v) => s + v.resultado, 0);
+      const perdidas = ventas.filter(v => v.resultado < 0).reduce((s, v) => s + v.computable, 0);
+      const bloqueadas = ventas.reduce((s, v) => s + (v.resultadoBloqueado || 0), 0);
       const saldoGP = ganancias + perdidas;
 
       const divs = Store.ops().filter(o => o.tipo === 'dividendo' && (o.fecha || '').slice(0, 4) === a);
@@ -4079,7 +4116,10 @@ const Vistas = (() => {
         </button>`;
       }).join('') || `<p class="small mut">Sin estrategias. Crea una o pide un paquete.</p>`;
 
-      const usados = [...new Set(sel.flatMap(f => f.condiciones.map(c => c.campo)))].slice(0, 7);
+      /* La capitalización ya tiene su columna en millones: repetirla aquí la
+         sacaría en euros enteros al lado */
+      const usados = [...new Set(sel.flatMap(f => f.condiciones.map(c => c.campo)))]
+        .filter(k => k !== 'capitalizacion').slice(0, 7);
       const cols = usados.map(k => CAMPOS.find(c => c.k === k)).filter(Boolean);
 
       /* Sin empresas no hay tabla que enseñar: solo el mensaje, sin cabeceras
@@ -4128,7 +4168,29 @@ const Vistas = (() => {
               <button class="btn mini" data-cb-vig="${e.id}">Vigilar</button>
             </td>
           </tr>`;
-        }).join('') : `<tr><td colspan="12" class="vacio"><b>${emps.length ? 'Ninguna pasa el corte' : 'Universo vacío'}</b>${emps.length ? 'Afloja una condición o cambia a «Todas, ordenadas por nota».' : 'Importa una tabla de cualquier screener: pegada o en archivo.'}</td></tr>`}</tbody>`;
+        }).join('') : `<tr><td colspan="12" class="vacio">${(() => {
+          if (!emps.length) return `<b>Universo vacío</b>Importa una tabla de cualquier screener: pegada o en archivo.`;
+          /* Decir POR QUÉ no sale ninguna, que casi siempre es por datos que
+             la página de origen no trae, y dar la salida en un clic */
+          const t = filas();
+          const incompletas = t.filter(d => sel.some(f => d.ev[f.id].estado === 'incompleto') && !sel.some(f => d.ev[f.id].estado === 'no')).length;
+          const fallan = t.filter(d => sel.some(f => d.ev[f.id].estado === 'no')).length;
+          const faltan = [...new Set(t.flatMap(d => sel.flatMap(f =>
+            d.ev[f.id].detalle.filter(x => x.estado === 'sindato').map(x => x.campo.n))))];
+          /* Solo ofrezco la salida que de verdad enseñaría empresas: un botón
+             que lleva a otra tabla vacía es peor que no ponerlo */
+          const cuantas = (m, cb) => t.filter(d => m === 'aptas' ? (cb === 'todas' ? d.pasaTodas : d.pasaAlguna)
+            : (m === 'casi' ? ((cb === 'todas' ? d.pasaTodas : d.pasaAlguna) || sel.every(f => d.ev[f.id].estado !== 'no')) : true)).length;
+          const nCasi = cuantas('casi', combi), nAlguna = cuantas(modo, 'alguna');
+          return `<b>De ${emps.length} ${emps.length === 1 ? 'empresa' : 'empresas'}, ninguna pasa el corte</b>
+            ${incompletas ? `${incompletas} no ${incompletas === 1 ? 'falla' : 'fallan'} nada: solo les falta algún dato que la página de origen no traía${faltan.length ? ` (${faltan.slice(0, 4).join(', ')})` : ''}. ` : ''}${fallan ? `${fallan} ${fallan === 1 ? 'falla' : 'fallan'} alguna condición. ` : ''}
+            ${sel.length > 1 && combi === 'todas' ? `Y les estás pidiendo pasar las ${sel.length} estrategias a la vez. ` : ''}
+            <span style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+              ${nCasi && modo === 'aptas' ? `<button class="btn mini" id="cb-salida-casi">Contar las incompletas (${nCasi})</button>` : ''}
+              ${nAlguna && sel.length > 1 && combi === 'todas' ? `<button class="btn mini" id="cb-salida-alguna">Basta con una estrategia (${nAlguna})</button>` : ''}
+              <button class="btn mini" id="cb-salida-todas">Enséñame las ${emps.length} ordenadas por nota</button>
+            </span>`;
+        })()}</td></tr>`}</tbody>`;
 
       const leyenda = $('#cb-leyenda');
       leyenda.innerHTML = sel.length
@@ -4146,6 +4208,11 @@ const Vistas = (() => {
       $$('[data-cb-vig]').forEach(b => b.onclick = () => aVigilancia(b.dataset.cbVig));
       ['#cb-modo', '#cb-combi'].forEach(x => $(x).onchange = render);
       $('#cb-buscar').oninput = e => { busca = e.target.value; render(); };
+      /* Salidas de un clic cuando el corte deja la tabla vacía */
+      const salida = (id, sel2, val) => { const b = $(id); if (b) b.onclick = () => { $(sel2).value = val; render(); }; };
+      salida('#cb-salida-casi', '#cb-modo', 'casi');
+      salida('#cb-salida-alguna', '#cb-combi', 'alguna');
+      salida('#cb-salida-todas', '#cb-modo', 'todas');
     }
 
     /* Por qué pasa o por qué no, condición a condición */
@@ -5027,8 +5094,8 @@ const Vistas = (() => {
       const porCaducar = f.pendientes.filter(p => p.restan <= 1);
       if (porCaducar.length) avisos.push({ c: 'alta', t: 'Minusvalías a punto de caducar',
         p: `${porCaducar.map(p => `${Util.eur(Math.abs(p.importe), 0)} de ${p.ano} caducan en ${p.caduca}`).join(', ')}. Si tienes plusvalías latentes, este es el año de aflorarlas.` });
-      if (f.ventas.some(v => v.bloqueada)) avisos.push({ c: 'alta', t: 'Pérdidas bloqueadas por recompra',
-        p: 'Has recomprado el mismo valor dentro de los dos meses. Esas pérdidas no se pueden compensar hasta que vendas los títulos nuevos.' });
+      if (f.ventas.some(v => v.bloqueada)) avisos.push({ c: 'alta', t: 'Pérdidas aparcadas por la regla de los dos meses',
+        p: `${Util.eur(Math.abs(f.bloqueadas), 0)} en pérdidas que no computan este año: te quedaste títulos del mismo valor comprados dentro de los dos meses. Vuelven cuando vendas esos títulos, y entonces hay que meterlas a mano.` });
       $('#fs-avisos').innerHTML = avisos.length
         ? `<ul class="motivos" style="margin-bottom:16px">${avisos.map(a =>
             `<li class="${a.c}"><i class="sev"></i><div><b>${Util.esc(a.t)}</b><p>${Util.esc(a.p)}</p></div></li>`).join('')}</ul>` : '';
@@ -5073,7 +5140,7 @@ const Vistas = (() => {
           const a = Store.activo(v.activoId);
           return `<tr>
             <td class="nowrap">${Util.fecha(v.fecha)}</td>
-            <td class="tick">${a ? Util.esc(a.ticker) : '—'}${v.bloqueada ? '<small class="neg">bloqueada</small>' : ''}</td>
+            <td class="tick">${a ? Util.esc(a.ticker) : '—'}${v.bloqueada ? `<small class="neg">${v.parcial ? `aparcada al ${Util.num(v.parteBloqueada * 100, 0)} %` : 'aparcada'}</small>` : ''}</td>
             <td class="r num">${Util.num(v.titulos, v.titulos < 10 ? 4 : 0)}</td>
             <td class="r num">${Util.eur(v.importe, 0)}</td>
             <td class="r num">${Util.eur(v.coste, 0)}</td>
@@ -5109,7 +5176,7 @@ const Vistas = (() => {
       f.ventas.forEach(v => {
         const a = Store.activo(v.activoId);
         L.push(['Venta', v.fecha, a ? a.ticker : '', v.titulos, v.importe.toFixed(2), v.coste.toFixed(2), v.resultado.toFixed(2),
-          v.consumidos.map(c => `${c.titulos} de ${c.fecha} a ${c.precio}`).join(' | ') + (v.bloqueada ? ' [bloqueada por recompra]' : '')]
+          v.consumidos.map(c => `${c.titulos} de ${c.fecha} a ${c.precio}`).join(' | ') + (v.bloqueada ? ` [aparcada${v.parcial ? ` al ${Math.round(v.parteBloqueada * 100)} %` : ''} por la regla de los dos meses]` : '')]
           .join(';').replace(/\./g, ','));
       });
       f.divs.forEach(o => {
@@ -6454,10 +6521,14 @@ const Sim = (() => {
           }).join('')}</tbody></table></div></div>
 
       ${r.recompra ? `<ul class="motivos" style="margin-top:14px"><li class="${r.comprasRecientes.length ? 'critica' : 'alta'}"><i class="sev"></i><div>
-        <b>${r.comprasRecientes.length ? 'Esta pérdida no te la vas a poder compensar todavía' : 'Vendes con pérdidas: cuidado con recomprar'}</b>
+        <b>${r.comprasRecientes.length
+          ? (r.titulosAparcados >= r.titulos - 0.0000001 ? 'Esta pérdida no te la vas a poder compensar todavía' : 'Parte de esta pérdida queda aparcada')
+          : 'Vendes con pérdidas: cuidado con recomprar'}</b>
         <p>${r.comprasRecientes.length
-          ? `Compraste ${Util.esc(r.a.ticker)} el ${Util.fecha(r.comprasRecientes[r.comprasRecientes.length - 1].fecha)}, dentro de los dos meses anteriores. La pérdida queda aparcada hasta que vendas también esos títulos.`
-          : 'Si vuelves a comprar el mismo valor dentro de los dos meses siguientes, la pérdida no se puede compensar hasta que vendas los títulos nuevos.'}</p></div></li></ul>` : ''}
+          ? `Compraste ${Util.esc(r.a.ticker)} el ${Util.fecha(r.comprasRecientes[r.comprasRecientes.length - 1].fecha)}, dentro de los dos meses anteriores, y tras esta venta te seguirían quedando ${Util.num(Math.min(r.titulosAparcados, r.titulos), 0)} de esos títulos. ${r.titulosAparcados >= r.titulos - 0.0000001
+              ? 'La pérdida entera'
+              : `Esa parte de la pérdida (unos ${Util.eur(Math.abs(r.ganancia) * Math.min(1, r.titulosAparcados / r.titulos), 0)} de ${Util.eur(Math.abs(r.ganancia), 0)})`} queda aparcada hasta que vendas también esos títulos.`
+          : `Si vuelves a comprar ${Util.esc(r.a.ticker)} dentro de los dos meses siguientes, la pérdida no se puede compensar hasta que vendas los títulos nuevos. ${r.cierraPosicion ? 'Cerrando la posición entera y sin recomprar, computa toda.' : ''}`}</p></div></li></ul>` : ''}
 
       <p class="nota-graf">El impuesto es una estimación con la escala estatal del ahorro sobre los datos que has puesto arriba. No incluye nada más que haya pasado en tu declaración, y no soy asesor fiscal: para una operación grande, consúltalo.</p>`;
   }
@@ -6471,7 +6542,7 @@ const Sim = (() => {
       cuerpo: `
         <div class="form-grid">
           <div class="field"><label>Títulos a vender (tienes ${Util.num(p.titulos, p.titulos < 10 ? 4 : 0)})</label>
-            <input type="number" step="any" id="sm-tit" value="${p.titulos}"></div>
+            <input type="number" step="any" min="0" max="${p.titulos}" id="sm-tit" value="${p.titulos}"></div>
           <div class="field"><label>Precio de venta</label>
             <input type="number" step="any" id="sm-pr" value="${Util.n(a.cotizacion.precio)}"></div>
           <div class="field"><label>Comisión</label><input type="number" step="any" id="sm-co" value="0"></div>

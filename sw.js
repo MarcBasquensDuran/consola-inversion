@@ -5,7 +5,7 @@
    Es lo único que hay que tocar aquí: al cambiar, el móvil se entera
    de que hay versión nueva y te avisa para recargar.
    ═══════════════════════════════════════════════════════════════ */
-const VERSION = 'v4';
+const VERSION = 'v5';
 
 const CACHE = 'consola-' + VERSION;
 const ARCHIVOS = [
@@ -19,7 +19,8 @@ const ARCHIVOS = [
   './estudio.js',
   './icono-192.png',
   './icono-512.png',
-  './icono-512-maskable.png'
+  './icono-512-maskable.png',
+  './icono-apple.png'
 ];
 
 /* Al instalar: guardar todo para poder funcionar sin conexión */

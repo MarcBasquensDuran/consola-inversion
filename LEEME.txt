@@ -177,3 +177,56 @@ TRES AVISOS NUEVOS EN EL SEMÁFORO
 
   Como siempre: el veredicto que proponga un estudio es una sugerencia.
   No cambia nada por sí solo.
+
+
+==============================================================
+REVISIÓN A FONDO · QUÉ SE CORRIGIÓ ANTES DE SUBIRLO
+==============================================================
+
+LA REGLA DE LOS DOS MESES ESTABA DE MÁS
+
+  Antes daba por perdida cualquier pérdida si habías comprado el
+  mismo valor dentro de los dos meses, incluida la compra que creó
+  la posición. Con eso, comprar en enero y vender entero en marzo
+  con pérdidas salía como «no compensable», y sí lo es: lo que la
+  ley impide no es vender con pérdidas, es quedarte el valor en la
+  mano.
+
+  Ahora mira si tras la venta TE SIGUEN QUEDANDO títulos de esas
+  compras, y si solo queda una parte, aparca solo esa parte (verás
+  «aparcada al 40 %» en la tabla de ventas). Si cierras del todo y
+  no recompras, la pérdida computa entera.
+
+  Lo mismo en el simulador de venta, que avisaba cuando no tocaba.
+
+EL CRIBADO SALÍA VACÍO LA PRIMERA VEZ
+
+  Venía de fábrica con dos estrategias encendidas a la vez y
+  «deben pasar todas»: con una tabla recién descargada no pasaba
+  ninguna empresa y la tabla aparecía vacía sin explicar por qué.
+
+  Ahora viene con una sola estrategia encendida (small caps), y
+  «qué enseño» empieza en «las que pasan y las incompletas»,
+  porque las descargas gratuitas casi nunca traen todos los campos.
+
+  Y cuando aun así no pasa ninguna, el mensaje dice cuántas fallan,
+  cuántas solo tienen datos incompletos y QUÉ dato les falta, con
+  un botón para verlas. Solo salen los botones que de verdad
+  enseñan empresas.
+
+  La capitalización ya no sale dos veces (una en millones y otra
+  en euros enteros).
+
+LO QUE SE COMPROBÓ Y ESTABA BIEN
+
+  · FIFO, coste medio, dividendos y retenciones: 17 casos a mano.
+  · La escala del ahorro, incluido el 30 % de más de 300.000 €
+    (Ley 7/2024, desde 2025).
+  · Compensación de pérdidas: arrastre, caducidad a los cuatro
+    ejercicios y el tope del 25 % de los dividendos.
+  · Las doce pestañas y los 35 botones, en ordenador y en móvil,
+    con datos y con la cartera vacía.
+  · Abrir archivos de versiones anteriores, con listas que faltan,
+    textos donde van números, nulos y fechas imposibles.
+  · Deshacer, rehacer, copias de seguridad y restaurar.
+  · Sincronización entre dos aparatos y los avisos del calendario.
