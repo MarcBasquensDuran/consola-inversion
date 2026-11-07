@@ -94,14 +94,42 @@ const Nube = (() => {
     });
   }
 
+  /* Google explica en el cuerpo de la respuesta qué ha pasado. Si nos quedamos
+     con el número suelto, un 403 puede ser cinco cosas distintas y no hay por
+     dónde cogerlo, así que leemos el motivo y lo contamos en castellano. */
   function api(url, opts) {
+    const servicio = /googleapis\.com\/calendar/.test(url) ? 'Calendar' : 'Drive';
     return fetch(url, Object.assign({}, opts, {
       headers: Object.assign({ Authorization: 'Bearer ' + token }, (opts || {}).headers || {})
     })).then(r => {
       if (r.status === 401) { token = null; expira = 0; throw new Error('sesión caducada'); }
-      if (!r.ok) throw new Error('Drive ha respondido ' + r.status);
-      return r;
+      if (r.ok) return r;
+      return r.text().then(t => {
+        let j = null; try { j = JSON.parse(t); } catch (e) {}
+        const err = (j && j.error) || {};
+        const det = (err.errors && err.errors[0]) || {};
+        const razon = det.reason || (err.details && (err.details.find(d => d.reason) || {}).reason) || '';
+        const dice = err.message || '';
+        throw new Error(explicar(r.status, razon, dice, servicio));
+      });
     });
+  }
+
+  /* Las tres que de verdad pasan, dichas de manera que se puedan arreglar */
+  function explicar(estado, razon, dice, servicio) {
+    const api = servicio === 'Calendar' ? 'Google Calendar API' : 'Google Drive API';
+    if (estado === 403 && (razon === 'accessNotConfigured' || /SERVICE_DISABLED|has not been used in project|is disabled/i.test(dice)))
+      return `Falta activar la ${api} en tu proyecto de Google. ` +
+             `Entra en console.cloud.google.com, busca «${api}» en la Biblioteca de APIs, ` +
+             `pulsa «Habilitar» y vuelve a intentarlo.`;
+    if (estado === 403 && (razon === 'insufficientPermissions' || /insufficient|scope/i.test(dice)))
+      return `No le has dado permiso de ${servicio === 'Calendar' ? 'calendario' : 'Drive'} todavía. ` +
+             `Desconecta y vuelve a conectar en Ajustes, y acepta la pantalla de permisos que saldrá.`;
+    if (estado === 403 && razon === 'rateLimitExceeded')
+      return 'Google está limitando las peticiones. Espera un minuto y vuelve a intentarlo.';
+    if (estado === 404) return `${servicio} no encuentra eso. Si borraste el calendario o el archivo a mano, vuelve a sincronizar y se recrea.`;
+    if (estado >= 500) return `Google está dando problemas ahora mismo (${estado}). Inténtalo dentro de un rato.`;
+    return `${servicio} ha respondido ${estado}${dice ? ': ' + dice : ''}`;
   }
 
   /* ---- Carpeta y archivo ---- */

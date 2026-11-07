@@ -326,9 +326,11 @@ const Agenda = (() => {
         <div class="kv"><span>Avisos puestos</span><b>${Util.n(c.creados)}</b></div>
 
         ${c.error ? `<ul class="motivos" style="margin-top:12px"><li class="alta"><i class="sev"></i><div>
-          <b>${Util.esc(c.error)}</b>
-          <p>Si acabas de activar los avisos, Google tiene que pedirte permiso otra vez para el
-          calendario. Pulsa «Poner el calendario al día» y acepta.</p></div></li></ul>` : ''}
+          <b>No se ha podido poner el calendario al día</b>
+          <p>${Util.esc(c.error)}</p>
+          ${/permiso|conectar/i.test(c.error) ? '' : `<p class="small mut">Si acabas de activar los avisos, puede que Google
+          tenga que pedirte permiso otra vez para el calendario: pulsa «Poner el calendario al día» y acepta.</p>`}
+        </div></li></ul>` : ''}
 
         <div class="bloque-t">Lo que va a aparecer en tu calendario</div>
         ${prox.length ? `<ul class="hist">${prox.slice(0, 12).map(e => `
@@ -367,7 +369,9 @@ const Agenda = (() => {
       Util.toast('Actualizando el calendario…');
       sincronizar({ interactivo: true }).then(r => {
         pintarAjustes();
-        Util.toast(r.estado === 'error' ? r.error
+        /* Un aviso largo no cabe en el toast: ahí va lo corto y el porqué queda arriba */
+        Util.toast(r.estado === 'error'
+          ? (String(r.error || '').length > 70 ? 'No se ha podido: mira el motivo aquí arriba' : r.error)
           : `Calendario al día con ${r.eventos} ${r.eventos === 1 ? 'aviso' : 'avisos'}`,
           r.estado === 'error' ? 'err' : '');
       });
