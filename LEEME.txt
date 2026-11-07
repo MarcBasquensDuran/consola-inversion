@@ -1,0 +1,45 @@
+CONSOLA DE INVERSIÓN · Fase 1: app instalable en GitHub Pages
+==============================================================
+
+QUÉ HAY EN ESTA CARPETA
+
+  index.html               El programa entero. Es el único archivo que
+                           cambia cuando te paso una versión nueva.
+  manifest.webmanifest     Hace que el móvil la reconozca como app.
+  sw.js                    Permite usarla sin conexión. Lleva dentro un
+                           número de VERSIÓN que hay que subir en cada
+                           actualización (ver más abajo).
+  icono-*.png              Los iconos de la app.
+
+  NO hay ningún dato tuyo aquí dentro. Tu cartera vive en el navegador,
+  nunca en estos archivos, así que puedes subirlos a un repositorio
+  público sin que nadie vea un solo número tuyo.
+
+
+CÓMO ACTUALIZAR CUANDO TE PASE UNA VERSIÓN NUEVA
+
+  1. Sube el index.html nuevo al repositorio, sustituyendo el viejo.
+  2. Abre sw.js y sube el número de la primera línea:
+        const VERSION = 'v1';   ->   const VERSION = 'v2';
+     Guárdalo y súbelo también.
+  3. Abre la app en el móvil. Saldrá abajo un aviso de «Hay una versión
+     nueva» con un botón. Al pulsarlo se recarga ya actualizada.
+
+  Si no cambias el número de VERSIÓN, el móvil puede seguir enseñándote
+  la versión vieja durante un rato. Es el fallo más común.
+
+
+TUS DATOS
+
+  Viven en el navegador del dispositivo donde abras la app, separados
+  para cada dirección. Los datos del archivo que abrías con doble clic
+  NO aparecen solos aquí: hay que pasarlos una vez.
+
+     En el archivo viejo:  Ajustes > Guardar archivo
+     En la app nueva:      Ajustes > Abrir archivo
+
+  Nunca subas ese archivo JSON al repositorio: ahí sí está tu cartera.
+
+  Mientras no esté lista la fase 2 (Drive), el móvil y el ordenador
+  tienen datos separados. Para pasar de uno a otro, el mismo camino:
+  guardar archivo en uno y abrirlo en el otro.
