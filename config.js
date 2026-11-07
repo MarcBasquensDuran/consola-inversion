@@ -11,7 +11,7 @@
    Mientras esté vacío, el programa funciona igual de bien: solo que
    guarda los datos en este dispositivo y no se sincroniza con Drive.
    ═══════════════════════════════════════════════════════════════ */
-window.CONFIG = {
+window.CONFIG = {94523400061-8msos6tn48b0r142i3vuiqkrpdif611a.apps.googleusercontent.com
   clientId: '',
 
   /* Nombre del archivo y de la carpeta que la app crea en tu Drive.
