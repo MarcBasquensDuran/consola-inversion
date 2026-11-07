@@ -7,12 +7,18 @@
    sitio de sobra, y es la que permite juntar los cambios de dos
    dispositivos sin perder ninguno. */
 const Nube = (() => {
-  const SCOPE = 'https://www.googleapis.com/auth/drive.file';
+  const SCOPE_DRIVE = 'https://www.googleapis.com/auth/drive.file';
+  /* Solo los calendarios que crea la app: no puede ver ni tocar los tuyos */
+  const SCOPE_AGENDA = 'https://www.googleapis.com/auth/calendar.app.created';
+  const scopes = () => {
+    const a = (Store.ajustes && Store.ajustes().avisos) || {};
+    return a.activo ? SCOPE_DRIVE + ' ' + SCOPE_AGENDA : SCOPE_DRIVE;
+  };
   const KEY_EST = 'ENGINE_CARTERA_V1_NUBE';
   const cfg = () => Object.assign({ clientId: '', archivo: 'consola-inversion.json',
     carpeta: 'Consola de inversión', cadaMinutos: 10 }, window.CONFIG || {});
 
-  let token = null, expira = 0, cliente = null, sincronizando = false;
+  let token = null, expira = 0, cliente = null, sincronizando = false, scopeActual = '';
   let est = { conectado: false, ultima: '', archivoId: '', carpetaId: '',
               huella: '', correo: '', conflictos: [], error: '', ultimaCopia: '' };
 
@@ -49,10 +55,13 @@ const Nube = (() => {
   const tokenVivo = () => token && Date.now() < expira - 60000;
 
   function iniciar() {
-    if (cliente || !hayClientId()) return;
+    /* Si han cambiado los permisos que hacen falta, hay que rehacer el cliente */
+    if (cliente && scopeActual === scopes()) return;
+    if (!hayClientId()) return;
     if (!(window.google && google.accounts && google.accounts.oauth2)) return;
+    scopeActual = scopes();
     cliente = google.accounts.oauth2.initTokenClient({
-      client_id: cfg().clientId, scope: SCOPE,
+      client_id: cfg().clientId, scope: scopeActual,
       callback: r => {
         if (r && r.access_token) {
           token = r.access_token;
@@ -73,8 +82,11 @@ const Nube = (() => {
   /* `callado` intenta renovar sin molestar; solo funciona si ya diste permiso antes */
   function pedirToken(callado) {
     return new Promise(res => {
+      const antes = scopeActual;
       iniciar();
       if (!cliente) { est.error = 'Falta el identificador de Google en config.js'; return res(false); }
+      /* Permisos nuevos: el token viejo ya no sirve */
+      if (antes && antes !== scopeActual) { token = null; expira = 0; }
       if (tokenVivo()) return res(true);
       pendiente = res;
       try { cliente.requestAccessToken({ prompt: callado ? '' : 'consent' }); }
@@ -484,5 +496,6 @@ const Nube = (() => {
   }
 
   return { init, sincronizar, desconectar, estado: () => est, hayClientId,
-           refrescarIndicador, pintarAjustes, preguntarPrimeraVez, leerBase, guardarBase };
+           refrescarIndicador, pintarAjustes, preguntarPrimeraVez, leerBase, guardarBase,
+           api, pedirToken, guardarEstado, scopes };
 })();

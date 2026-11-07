@@ -1099,6 +1099,12 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
     </div>
 
     <div class="card">
+      <div class="card-h"><h3>Avisos en el calendario</h3>
+        <div class="sub">Para que las fechas te busquen a ti</div></div>
+      <div class="card-b" id="ag-cuerpo"></div>
+    </div>
+
+    <div class="card">
       <div class="card-h"><h3>Pantalla</h3>
         <div class="sub">Cómo se comporta el programa en el móvil</div></div>
       <div class="card-b">
@@ -5025,6 +5031,7 @@ const Vistas = (() => {
       $('#uso-undo').textContent = un ? un.desc : 'nada pendiente';
       if (typeof Pantalla !== 'undefined') Pantalla.selector();
       if (typeof Nube !== 'undefined') { Nube.pintarAjustes(); Nube.refrescarIndicador(); }
+      if (typeof Agenda !== 'undefined') Agenda.pintarAjustes();
       $('#uso-bytes').textContent = Util.bytes(e.datos + e.copias);
       const cs = Store.copias();
       $('#uso-copia').textContent = cs.length ? new Date(cs[0].ts).toLocaleString('es-ES') : '—';
@@ -5473,6 +5480,7 @@ const Vistas = (() => {
 
 <script src="./fusion.js"></script>
 <script src="./nube.js"></script>
+<script src="./agenda.js"></script>
 <script>
 /* ═══════════════ FICHA DEL ACTIVO ═══════════════ */
 const Ficha = (() => {

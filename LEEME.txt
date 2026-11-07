@@ -87,3 +87,48 @@ SI ALGO VA MAL
   Tus datos nunca dependen solo de Drive: «Ajustes > Guardar archivo»
   sigue funcionando y es tu salvavidas. Si la sincronización falla, el
   programa sigue guardando en el aparato como siempre.
+
+
+==============================================================
+FASE 3 · AVISOS EN EL CALENDARIO
+==============================================================
+
+ARCHIVO NUEVO
+
+  agenda.js    Lleva las fechas del programa a un calendario propio.
+
+PERMISO QUE PIDE
+
+  calendar.app.created: la app crea un calendario llamado «Consola de
+  inversión» y solo puede tocar ESE. No ve ni modifica ninguno de los
+  demás calendarios que tengas.
+
+  Al activarlo por primera vez, Google volverá a pedirte permiso, porque
+  es un permiso nuevo que antes no habías dado. Es normal.
+
+QUÉ AVISOS PONE
+
+  · Revisar una empresa          (de la cadencia de cada ficha)
+  · Vence el plazo de una hipótesis
+  · Pedir el informe de seguimiento
+  · Cierre fiscal del año        (31 de diciembre)
+  · Minusvalía a punto de caducar
+
+  De cada uno eliges: si lo quieres, cuántos días antes, a qué hora y
+  si quieres notificación, correo o solo verlo en el calendario.
+
+  Hay además un límite de horizonte (por defecto, año y medio) para que
+  los plazos lejanos no te llenen el calendario. Los que queden fuera
+  entran solos cuando se acercan.
+
+CÓMO FUNCIONA
+
+  Ajustes > Avisos en el calendario > marcar la casilla, ajustar la
+  tabla y pulsar «Poner el calendario al día».
+
+  Cada aviso tiene un identificador fijo, así que al repetir no se
+  duplican: los que cambian de fecha se mueven, y los que ya no tocan
+  (hipótesis rota, revisión hecha, tipo de aviso apagado) se borran
+  solos del calendario.
+
+  «Quitar todos los avisos» los borra sin tocar el calendario.

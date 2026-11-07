@@ -5,7 +5,7 @@
    Es lo único que hay que tocar aquí: al cambiar, el móvil se entera
    de que hay versión nueva y te avisa para recargar.
    ═══════════════════════════════════════════════════════════════ */
-const VERSION = 'v2';
+const VERSION = 'v3';
 
 const CACHE = 'consola-' + VERSION;
 const ARCHIVOS = [
@@ -15,6 +15,7 @@ const ARCHIVOS = [
   './config.js',
   './fusion.js',
   './nube.js',
+  './agenda.js',
   './icono-192.png',
   './icono-512.png',
   './icono-512-maskable.png'
