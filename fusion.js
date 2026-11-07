@@ -79,8 +79,12 @@ const Fusion = (() => {
       if (er && !el) { salida.push(er); return; }   /* nuevo allí */
 
       if (soloAñadir) {
-        /* No se editan: con que exista en los dos, vale cualquiera */
-        salida.push(el);
+        /* No se editan, pero sí se marcan: haber leído algo en un aparato
+           vale para los dos, así que las marcas se suman en vez de pisarse. */
+        const x = Object.assign({}, el);
+        ['leido', 'fijado', 'resuelto'].forEach(f => { if (el[f] || er[f]) x[f] = true; });
+        if (el.estado === 'procesada' || er.estado === 'procesada') x.estado = 'procesada';
+        salida.push(x);
         return;
       }
       salida.push(fusionarValor(eb, el, er, k, ctx));

@@ -363,6 +363,30 @@ td input,td select{padding:4px 7px;font-size:12.5px}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.err{background:var(--v-vender)}
 
+/* ---------- Titular del último estudio ---------- */
+.titular{display:flex;align-items:baseline;gap:6px;margin-top:4px;font-size:12px;
+  font-weight:500;color:var(--c-ink-soft);line-height:1.35;max-width:420px}
+.titular i{width:7px;height:7px;border-radius:50%;background:var(--c-accent);flex:none;
+  align-self:center}
+.titular.nuevo{color:var(--c-ink);font-weight:600}
+.titular time{color:var(--c-muted);font-weight:440;font-size:11px;white-space:nowrap;flex:none}
+
+/* ---------- El informe dentro de la ficha ---------- */
+.estudio{border:1px solid var(--c-border);border-radius:var(--r-s);margin-bottom:10px;
+  background:var(--c-surface);overflow:hidden}
+.estudio.sin-leer{border-left:3px solid var(--c-accent)}
+.estudio-h{padding:10px 12px;cursor:pointer;display:flex;gap:10px;align-items:flex-start}
+.estudio-h:hover{background:var(--c-surface-2)}
+.estudio-h .tt{flex:1;min-width:0}
+.estudio-h .tt b{display:block;font-size:13.5px;line-height:1.4}
+.estudio-h .tt span{font-size:11.5px;color:var(--c-muted)}
+.estudio-b{display:none;padding:0 12px 12px}
+.estudio.abierto .estudio-b{display:block}
+.estudio-b h4{margin:14px 0 4px;font-size:12px;text-transform:uppercase;
+  letter-spacing:.04em;color:var(--c-muted)}
+.estudio-b p{font-size:13.5px;line-height:1.62;white-space:pre-wrap}
+.estudio-res{font-family:var(--ff-tesis);font-size:14.5px;line-height:1.6;margin-bottom:6px}
+
 /* ---------- Indicador de sincronización ---------- */
 .nube{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;
   border:1px solid var(--c-border-strong);background:var(--c-surface);cursor:pointer;
@@ -791,6 +815,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
         <h3>Posiciones</h3>
         <div class="sub" id="cartera-sub"></div>
         <div class="toolbar no-print">
+          <button class="btn pri" id="btn-estudio">Encargar estudio</button>
           <button class="btn" id="btn-comparar">Comparar</button>
           <button class="btn" id="btn-precios">Actualizar precios</button>
           <button class="btn pri" id="btn-nuevo-activo">Añadir activo</button>
@@ -2111,6 +2136,27 @@ const Store = (() => {
       a.alertas = Object.assign({ entrada: 0, salida: 0 }, a.alertas || {});
       a.checklist = Object.assign({ fecha: '', respuestas: {} }, a.checklist || {});
       a.historial = Array.isArray(a.historial) ? a.historial : [];
+      /* Estudios: se acumulan con fecha para poder comparar lo que pensabas
+         hace seis meses con lo de hoy. Se guardan los ocho últimos, más los
+         que hayas fijado, que no caducan nunca. */
+      a.estudios = Array.isArray(a.estudios) ? a.estudios : [];
+      a.estudios.forEach(e => {
+        e.id = e.id || Util.uid('es');
+        e.fecha = e.fecha || Util.hoy();
+        e.titular = e.titular || 'Sin titular';
+        e.veredicto = ACCIONES[e.veredicto] ? e.veredicto : '';
+        /* Si el texto llega con barra-ene literal en vez de un salto de línea,
+           se arregla aquí en vez de enseñarlo feo */
+        const saltos = t => String(t || '').replace(/\\r\\n|\\n/g, '\n');
+        e.resumen = saltos(e.resumen);
+        e.secciones = Array.isArray(e.secciones) ? e.secciones.filter(x => x && x.texto)
+          .map(x => ({ titulo: x.titulo || '', texto: saltos(x.texto) })) : [];
+        e.fuentes = Array.isArray(e.fuentes) ? e.fuentes.filter(x => x && (x.url || x.titulo)) : [];
+        e.leido = !!e.leido; e.fijado = !!e.fijado;
+      });
+      a.estudios.sort((x, y) => (y.fecha || '').localeCompare(x.fecha || ''));
+      let sueltos = 0;
+      a.estudios = a.estudios.filter(e => e.fijado || ++sueltos <= 8);
       a.notas = a.notas || '';
     });
 
@@ -2222,7 +2268,7 @@ const Store = (() => {
       const tk = String(t || '').toUpperCase();
       return state.activos.find(a => a.ticker.toUpperCase() === tk) ||
         (llegan.includes(tk) ? { ticker: tk, serie: [], fundamentales: [], tesis: { hipotesis: [] },
-                                 cotizacion: { precio: 0 }, _nuevo: true } : null);
+                                 estudios: [], cotizacion: { precio: 0 }, _nuevo: true } : null);
     };
     const anota = (tipo, activo, texto, clase) => cambios.push({ tipo, activo, texto, clase: clase || 'nuevo' });
 
@@ -2271,6 +2317,15 @@ const Store = (() => {
       if (partes.length) anota('Hipótesis', ex.ticker, `«${dest.texto}»: ${partes.join(' y ')}`, 'cambia');
     });
 
+    (paquete.estudios || []).forEach(es => {
+      const ex = es.activoId ? state.activos.find(x => x.id === es.activoId) : porTk(es.ticker);
+      if (!ex) { if (es.ticker && !desconocidos.includes(es.ticker)) desconocidos.push(es.ticker); return; }
+      const n = (es.secciones || []).length;
+      anota('Estudio', ex.ticker, `«${es.titular}»${n ? ` · ${n} apartados` : ''}`, 'nuevo');
+      const previos = ex._nuevo ? 0 : (ex.estudios || []).filter(x => !x.fijado).length;
+      if (previos >= 8) avisos.push(`${ex.ticker}: ya tienes ocho estudios guardados, así que al entrar este se irá el más antiguo. Fija los que quieras conservar.`);
+    });
+
     (paquete.noticias || []).forEach(n => {
       const ex = n.activoId ? state.activos.find(x => x.id === n.activoId) : porTk(n.ticker);
       if (!ex) { if (n.ticker && !desconocidos.includes(n.ticker)) desconocidos.push(n.ticker); return; }
@@ -2305,7 +2360,7 @@ const Store = (() => {
      y precios actualizados sobre activos que ya existen */
   function fusionar(paquete, opciones) {
     opciones = opciones || {};
-    const r = { activos: 0, ops: 0, precios: 0, noticias: 0, cifras: 0, hipotesis: 0, manual: 0, filtros: 0 };
+    const r = { activos: 0, ops: 0, precios: 0, noticias: 0, cifras: 0, hipotesis: 0, manual: 0, filtros: 0, estudios: 0 };
     const porTicker = t => state.activos.find(a => a.ticker.toUpperCase() === String(t || '').toUpperCase());
     (paquete.activos || []).forEach(a => {
       const ex = state.activos.find(x => x.id === a.id) || porTicker(a.ticker);
@@ -2401,6 +2456,19 @@ const Store = (() => {
       if (i >= 0) return;
       state.benchmark.serie.push({ fecha: b.fecha, valor: Util.n(b.valor) });
       r.indice = (r.indice || 0) + 1;
+    });
+
+    (paquete.estudios || []).forEach(es => {
+      const ex = es.activoId ? state.activos.find(x => x.id === es.activoId) : porTicker(es.ticker);
+      if (!ex) return;
+      ex.estudios = ex.estudios || [];
+      const dup = ex.estudios.some(x => x.id === es.id ||
+        (x.fecha === es.fecha && x.titular === es.titular));
+      if (dup) return;
+      const copia = Object.assign({}, es);
+      delete copia.ticker; delete copia.activoId;
+      ex.estudios.unshift(Object.assign({ id: Util.uid('es'), leido: false, fijado: false }, copia));
+      r.estudios = (r.estudios || 0) + 1;
     });
 
     (paquete.noticias || []).forEach(nt => {
@@ -3197,6 +3265,41 @@ const CATALOGO = [
     }
   },
   {
+    id: 'estudio_sin_leer', nombre: 'Tienes un estudio sin leer',
+    desc: 'Has pedido un análisis a fondo y todavía no lo has abierto. De poco sirve encargarlo si luego no se lee.',
+    tipos: ['accion', 'reit', 'etf', 'fondo', 'cripto', 'bono'], severidad: 'alta', accion: 'revisar', umbral: null,
+    evaluar: ({ a }) => {
+      const sin = (a.estudios || []).filter(e => !e.leido);
+      if (!sin.length) return null;
+      return { texto: `«${sin[0].titular}» (${Util.fecha(sin[0].fecha)})${sin.length > 1 ? ` y ${sin.length - 1} más` : ''}.` };
+    }
+  },
+  {
+    id: 'estudio_sugiere', nombre: 'El último estudio propone otra cosa',
+    desc: 'El veredicto que propuso el análisis no coincide con mantener. Es una sugerencia, no una orden: léela y decide.',
+    tipos: ['accion', 'reit', 'etf', 'fondo', 'cripto', 'bono'], severidad: 'alta', accion: 'revisar', umbral: null,
+    evaluar: ({ a }) => {
+      const e = (a.estudios || [])[0];
+      if (!e || !e.veredicto || e.veredicto === 'mantener') return null;
+      if (e.leido && e.resuelto) return null;
+      return { texto: `El estudio del ${Util.fecha(e.fecha)} propone ${ACCIONES[e.veredicto].toLowerCase()}: ${e.titular}` };
+    }
+  },
+  {
+    id: 'sin_estudio', nombre: 'Hace mucho que no la estudias a fondo',
+    desc: 'Meses desde el último estudio. Una posición que no se mira acaba siendo una posición que no se entiende.',
+    tipos: ['accion', 'reit', 'cripto'], severidad: 'baja', accion: 'revisar', umbral: 9, unidad: 'meses',
+    evaluar: ({ a, u }) => {
+      if (a.estado !== 'cartera') return null;
+      const e = (a.estudios || [])[0];
+      const meses = e ? Util.dias(e.fecha, Util.hoy()) / 30.44 : 999;
+      if (meses < u) return null;
+      return { texto: e
+        ? `El último estudio es del ${Util.fecha(e.fecha)}: hace ${Util.num(meses, 0)} meses.`
+        : 'Nunca le has pedido un estudio a fondo.' };
+    }
+  },
+  {
     id: 'noticia_pendiente', nombre: 'Novedades sin procesar',
     desc: 'Cuenta las noticias de impacto alto que ha traído el último informe y que todavía no has leído y decidido qué hacer con ellas.',
     tipos: ['accion', 'reit', 'etf', 'fondo', 'cripto', 'bono'], severidad: 'alta', accion: 'revisar', umbral: 1, unidad: 'noticias',
@@ -3782,6 +3885,8 @@ const Vistas = (() => {
             <div class="ver-id">
               <div class="t">${Util.esc(a.ticker)} · ${Util.esc(a.nombre)}</div>
               <div class="s">${TIPOS[a.tipo]} · ${Util.esc(a.sector || '—')}${vig ? ' · en vigilancia' : ''} · ${v.motivos.length} ${v.motivos.length === 1 ? 'aviso' : 'avisos'}</div>
+              ${(() => { const e = (a.estudios || [])[0]; return e ? `<div class="titular ${e.leido ? '' : 'nuevo'}">
+                ${e.leido ? '' : '<i></i>'}${Util.esc(e.titular)}<time>${Util.fecha(e.fecha)}</time></div>` : ''; })()}
             </div>
             ${barraRango(a, precio)}
             <div class="ver-cifras">
@@ -3845,7 +3950,10 @@ const Vistas = (() => {
           const a = f.a, p = f.p, m = Calc.margen(a);
           const v = Motor.evaluar(a, c);
           return `<tr>
-            <td class="tick">${Util.esc(a.ticker)}<small>${Util.esc(a.nombre)}</small></td>
+            <td class="tick">${Util.esc(a.ticker)}<small>${Util.esc(a.nombre)}</small>
+              ${(() => { const e = (a.estudios || [])[0]; return e ? `<div class="titular ${e.leido ? '' : 'nuevo'}" title="${Util.esc(e.resumen || '')}">
+                ${e.leido ? '' : '<i></i>'}${Util.esc(e.titular)}
+                <time>${Util.fecha(e.fecha)}</time></div>` : ''; })()}</td>
             <td><span class="pill tipo t-${a.tipo}">${TIPOS[a.tipo]}</span></td>
             <td class="r num">${Util.num(p.titulos, p.titulos < 10 ? 4 : 0)}</td>
             <td class="r num">${Util.num(p.costeMedio)}</td>
@@ -5481,6 +5589,7 @@ const Vistas = (() => {
 <script src="./fusion.js"></script>
 <script src="./nube.js"></script>
 <script src="./agenda.js"></script>
+<script src="./estudio.js"></script>
 <script>
 /* ═══════════════ FICHA DEL ACTIVO ═══════════════ */
 const Ficha = (() => {
@@ -5540,6 +5649,40 @@ const Ficha = (() => {
               </div>`).join('') || '<div class="vacio"><b>Sin hipótesis</b>Una tesis sin hipótesis comprobables no se puede romper, y por tanto no se puede defender.</div>'}
             </div>
           </div>
+
+          ${(() => {
+            const es = (a.estudios || []);
+            if (!es.length) return `<div class="card"><div class="card-h"><h3>Estudios</h3></div>
+              <div class="card-b"><div class="sin-motivos">Todavía no has pedido ninguno.
+              Desde Cartera, botón «Encargar estudio».</div></div></div>`;
+            return `<div class="card"><div class="card-h"><h3>Estudios</h3>
+              <div class="sub">${es.length} ${es.length === 1 ? 'informe' : 'informes'} · se guardan los ocho últimos</div></div>
+              <div class="card-b">${es.map((e, i) => `
+                <div class="estudio ${e.leido ? '' : 'sin-leer'} ${i === 0 ? 'abierto' : ''}" data-es="${e.id}">
+                  <div class="estudio-h" data-es-tog="${e.id}">
+                    <div class="tt">
+                      <b>${Util.esc(e.titular)}</b>
+                      <span>${Util.fecha(e.fecha)}${e.fijado ? ' · fijado' : ''}${e.leido ? '' : ' · sin leer'}</span>
+                    </div>
+                    ${e.veredicto ? `<span class="pill ${e.veredicto}">${ACCIONES[e.veredicto]}</span>` : ''}
+                  </div>
+                  <div class="estudio-b">
+                    ${e.resumen ? `<p class="estudio-res">${Util.esc(e.resumen)}</p>` : ''}
+                    ${e.secciones.map(sx => `<h4>${Util.esc(sx.titulo || '')}</h4><p>${Util.esc(sx.texto)}</p>`).join('')}
+                    ${e.fuentes.length ? `<h4>Fuentes</h4><div class="enl">${e.fuentes.map(f => f.url
+                      ? `<a href="${Util.esc(f.url)}" target="_blank" rel="noopener"><b>${Util.esc(f.titulo || f.url)}</b>
+                         <small>${Util.esc(f.fecha ? Util.fecha(f.fecha) : '')}</small></a>`
+                      : `<div class="small soft">${Util.esc(f.titulo)}</div>`).join('')}</div>` : ''}
+                    <div class="toolbar no-print" style="margin-top:12px">
+                      ${e.leido ? '' : `<button class="btn mini pri" data-es-leido="${e.id}">Marcar como leído</button>`}
+                      ${e.veredicto && e.veredicto !== 'mantener' && !e.resuelto
+                        ? `<button class="btn mini" data-es-resuelto="${e.id}">Ya he decidido</button>` : ''}
+                      <button class="btn mini" data-es-fijar="${e.id}">${e.fijado ? 'Dejar de fijar' : 'Fijar'}</button>
+                      <button class="btn mini" data-es-borrar="${e.id}">×</button>
+                    </div>
+                  </div>
+                </div>`).join('')}</div></div>`;
+          })()}
 
           ${a.fundamentales.length ? `<div class="card"><div class="card-h"><h3>Cifras del negocio</h3></div>
             <div class="card-b tight tbl-wrap"><table>
@@ -5685,6 +5828,33 @@ const Ficha = (() => {
         $$('[data-h-no]').forEach(b => b.onclick = () => {
           const h = a.tesis.hipotesis.find(x => x.id === b.dataset.hNo);
           h.sugerido = ''; Store.save(); abrir(id);
+        });
+        $$('[data-es-tog]').forEach(h => h.onclick = ev => {
+          if (ev.target.closest('button') || ev.target.closest('a')) return;
+          h.parentElement.classList.toggle('abierto');
+        });
+        $$('[data-es-leido]').forEach(b => b.onclick = () => {
+          const e = a.estudios.find(x => x.id === b.dataset.esLeido);
+          e.leido = true; Store.save(); abrir(id);
+        });
+        $$('[data-es-resuelto]').forEach(b => b.onclick = () => {
+          const e = a.estudios.find(x => x.id === b.dataset.esResuelto);
+          e.resuelto = true; e.leido = true;
+          Store.log(a, 'Estudio del ' + Util.fecha(e.fecha), 'propone ' + ACCIONES[e.veredicto], 'decidido');
+          Store.save(); abrir(id);
+        });
+        $$('[data-es-fijar]').forEach(b => b.onclick = () => {
+          const e = a.estudios.find(x => x.id === b.dataset.esFijar);
+          e.fijado = !e.fijado; Store.save(); abrir(id);
+        });
+        $$('[data-es-borrar]').forEach(b => b.onclick = () => {
+          const e = a.estudios.find(x => x.id === b.dataset.esBorrar);
+          Modal.confirmar('Borrar el estudio del ' + Util.fecha(e.fecha),
+            '«' + e.titular + '». No se puede recuperar salvo deshaciendo.', () => {
+              Store.marcar('Borrado de un estudio de ' + a.ticker);
+              a.estudios = a.estudios.filter(x => x.id !== b.dataset.esBorrar);
+              Store.save(); abrir(id); Util.toast('Estudio borrado');
+            }, 'Borrar');
         });
         $('#fi-add-hip').onclick = () => nuevaHipotesis(id);
         const bs = $('#fi-simular'); if (bs) bs.onclick = () => Sim.abrir(id);
@@ -6651,6 +6821,7 @@ const App = (() => {
   };
   $('#btn-precios').onclick = Ops.precios;
   $('#btn-comparar').onclick = Comp.elegir;
+  $('#btn-estudio').onclick = () => Estudio.abrir();
   $('#btn-cb-importar').onclick = () => Vistas.CribaV.importar();
   $('#btn-cb-csv').onclick = () => Vistas.CribaV.exportar();
   $('#btn-cb-vaciar').onclick = () => Vistas.CribaV.vaciar();

@@ -132,3 +132,48 @@ CÓMO FUNCIONA
   solos del calendario.
 
   «Quitar todos los avisos» los borra sin tocar el calendario.
+
+
+==============================================================
+FASE 4 · ESTUDIOS A FONDO
+==============================================================
+
+ARCHIVO NUEVO
+
+  estudio.js   El cuestionario que escribe el encargo del estudio.
+
+CÓMO SE USA
+
+  1. Cartera > «Encargar estudio».
+  2. Elige qué empresas (hay cinco formas de seleccionarlas), hasta
+     dónde quieres que llegue y qué quieres que mire.
+  3. Copia el encargo y pásamelo en un chat.
+  4. Carga el JSON que te devuelva: Ajustes > Cargar paquete, o
+     Cribado > Cargar paquete. Te enseña antes qué va a entrar.
+
+QUÉ LLEVA EL ENCARGO
+
+  Tus hipótesis abiertas con su métrica, su plazo y la última evidencia,
+  el precio que tienes guardado y su fecha, cuántas tomas de indicadores
+  llevas y cuándo fue el último estudio. Por eso el informe que vuelve
+  habla de TU tesis y no es un resumen de prensa.
+
+DÓNDE SE VE EL RESULTADO
+
+  El TITULAR, sin abrir nada: bajo el nombre de la empresa en la tabla
+  de Cartera y en su tarjeta del Semáforo. Con un punto azul mientras
+  esté sin leer.
+
+  El INFORME ENTERO, en la ficha de la empresa: resumen, apartados y
+  fuentes enlazadas. Se guardan los ocho últimos por empresa; los que
+  marques como «fijado» no caducan nunca.
+
+TRES AVISOS NUEVOS EN EL SEMÁFORO
+
+  · Tienes un estudio sin leer
+  · El último estudio propone otra cosa (hasta que pulses «Ya he
+    decidido»)
+  · Hace mucho que no la estudias a fondo (por defecto, nueve meses)
+
+  Como siempre: el veredicto que proponga un estudio es una sugerencia.
+  No cambia nada por sí solo.
