@@ -44,7 +44,7 @@ const Fusion = (() => {
      fusionada campo a campo descuadraría el FIFO y el informe fiscal. */
   const SOLO_AÑADIR = new Set([
     'operaciones', 'noticias', 'revisiones', 'informes', 'estudios',
-    'serie', 'historial', 'datos'
+    'serie', 'historial', 'datos', 'intereses'
   ]);
 
   function fusionarLista(base, local, remoto, nombre, ctx) {

@@ -570,6 +570,16 @@ tr.fila-papel td{background:var(--papel-tarjeta)}
   .fi-q{grid-area:q;font-size:13.5px}.fi-v{grid-area:v;font-size:13.5px}.fi-barra{grid-area:b;height:10px}
 }
 
+
+/* Importar del bróker */
+.imp-resumen{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.imp-n{display:flex;align-items:baseline;gap:10px;padding:8px 12px;border-radius:var(--r);background:var(--c-surface-2);font-size:13.5px}
+.imp-n b{font-size:18px;font-variant-numeric:tabular-nums;min-width:28px;text-align:right}
+.imp-n.si{background:var(--v-mantener-bg);color:var(--v-mantener)}
+.imp-fichas input.imp-tk{width:100px;font-variant-numeric:tabular-nums;text-transform:uppercase}
+.imp-fichas td small{display:block;font-size:11px;margin-top:3px}
+.imp-fichas select{min-width:96px}
+
 /* Buscador del catálogo de valores. La lista va DENTRO del flujo, debajo
    del campo: flotando se cortaba contra el borde del formulario en el móvil */
 .sugerencias{display:none;margin-top:6px;border:1px solid var(--c-border-strong);border-radius:var(--r);
@@ -1240,7 +1250,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
         <h3>Registro de operaciones</h3>
         <div class="sub" id="ops-sub"></div>
         <div class="toolbar no-print">
-          <button class="btn" id="btn-importar-ops">Importar CSV</button>
+          <button class="btn" id="btn-importar-ops" title="El extracto de Trade Republic tal cual, o un CSV propio">Importar del bróker o CSV</button>
           <button class="btn pri" id="btn-nueva-op">Registrar operación</button>
         </div>
       </div>
@@ -1295,7 +1305,8 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
     </div>
 
     <div class="card">
-      <div class="card-h"><h3>Dividendos del ejercicio</h3></div>
+      <div class="card-h"><h3>Dividendos e intereses del ejercicio</h3>
+        <div class="sub">Los dos son rendimientos del capital: tributan juntos en la base del ahorro</div></div>
       <div class="card-b tight tbl-wrap"><table id="tbl-fiscal-divs"></table></div>
     </div>
 
@@ -2293,6 +2304,13 @@ const Store = (() => {
       });
     });
 
+    /* Intereses de cuentas: van aparte de la cartera porque no son ningún valor */
+    if (!Array.isArray(d.intereses)) d.intereses = [];
+    d.intereses.forEach(i => {
+      i.id = i.id || Util.uid('in'); i.fecha = i.fecha || Util.hoy();
+      i.importe = Util.n(i.importe); i.retencion = Util.n(i.retencion); i.cuenta = i.cuenta || '';
+    });
+
     d.universo = Object.assign({ empresas: [], perfiles: {}, actualizado: '' }, d.universo || {});
     if (!Array.isArray(d.universo.empresas)) d.universo.empresas = [];
     if (!d.universo.perfiles || Array.isArray(d.universo.perfiles)) d.universo.perfiles = {};
@@ -2976,6 +2994,12 @@ const Calc = (() => {
       const divs = Store.ops().filter(o => o.tipo === 'dividendo' && (o.fecha || '').slice(0, 4) === a);
       const divBruto = divs.reduce((s, o) => s + o.importe, 0);
       const divRet = divs.reduce((s, o) => s + o.retencion, 0);
+      /* Intereses de las cuentas (Trade Republic, N26…): también son
+         rendimientos del capital mobiliario, igual que los dividendos */
+      const ints = (Store.get().intereses || []).filter(i => (i.fecha || '').slice(0, 4) === a);
+      const intBruto = ints.reduce((s, i) => s + Util.n(i.importe), 0);
+      const intRet = ints.reduce((s, i) => s + Util.n(i.retencion), 0);
+      const rcmBruto = divBruto + intBruto;
 
       let baseGP = 0, usadoBolsa = 0, compensadoRCM = 0, aBolsa = 0;
       if (saldoGP > 0) {
@@ -2993,7 +3017,7 @@ const Calc = (() => {
 
       /* Hasta un 25 % de los dividendos puede absorber pérdidas: primero las del
          año, y si quedan dividendos por compensar, las que vengan arrastradas */
-      let margen = divBruto * 0.25;
+      let margen = rcmBruto * 0.25;
       if (aBolsa > 0 && margen > 0) {
         const usa = Math.min(aBolsa, margen);
         aBolsa -= usa; compensadoRCM += usa; margen -= usa;
@@ -3008,18 +3032,18 @@ const Calc = (() => {
       if (aBolsa > 0) bolsa.push({ ano: a, restante: aBolsa, caduca: y + 4 });
       bolsa = bolsa.filter(b => b.restante > 0.005);
 
-      const baseRCM = divBruto - compensadoRCM;
+      const baseRCM = rcmBruto - compensadoRCM;
       const base = baseGP + baseRCM;
       const cuota = impuestoAhorro(base);
 
       if (a === objetivo) {
         res = {
           ano: a, ventas, ganancias, perdidas, bloqueadas, saldoGP,
-          divBruto, divRet, divs,
+          divBruto, divRet, divs, intBruto, intRet, ints, rcmBruto,
           usadoBolsa, compensadoRCM, aBolsa,
           caducadas: caducadas.filter(c => c.restante > 0.005),
           pendientes: bolsa.map(b => ({ ano: b.ano, importe: -b.restante, caduca: b.caduca, restan: b.caduca - y, manual: !!b.manual })),
-          baseGP, baseRCM, base, cuota, retenido: divRet, diferencia: cuota - divRet
+          baseGP, baseRCM, base, cuota, retenido: divRet + intRet, diferencia: cuota - divRet - intRet
         };
       }
     });
@@ -3027,7 +3051,8 @@ const Calc = (() => {
   }
 
   function anosConDatos() {
-    const set = new Set(Store.ops().map(o => (o.fecha || '').slice(0, 4)).filter(Boolean));
+    const set = new Set([...Store.ops().map(o => (o.fecha || '').slice(0, 4)),
+      ...(Store.get().intereses || []).map(i => (i.fecha || '').slice(0, 4))].filter(Boolean));
     return [...set].sort().reverse();
   }
 
@@ -4811,6 +4836,15 @@ const Vistas = (() => {
 
             /* Un paquete no es una tabla: en vez de fallar, se reconoce y se abre
                por el camino que le corresponde, con su previsualización */
+            if (typeof Brokers !== 'undefined' && Brokers.reconoce(crudo)) {
+              $('#cb-prev').innerHTML = `<ul class="motivos"><li class="media"><i class="sev"></i><div>
+                <b>Esto es un extracto de tu bróker, no una tabla de empresas</b>
+                <p>Son tus operaciones: van a la cartera, no al universo de cribado.</p>
+                <button class="btn pri mini" id="cb-a-broker" style="margin-top:8px">Importarlo en mis operaciones</button></div></li></ul>`;
+              $('#cb-ok').disabled = true;
+              $('#cb-a-broker').onclick = () => { Modal.cerrar(); setTimeout(() => Brokers.importar(crudo, 'Extracto pegado'), 220); };
+              return;
+            }
             const paq = Datos.esPaquete(crudo);
             if (paq) {
               const n = (paq.activos || []).length, t = (paq.datos || paq.precios || []).length;
@@ -5613,10 +5647,10 @@ const Vistas = (() => {
         ? `<ul class="motivos" style="margin-bottom:16px">${avisos.map(a =>
             `<li class="${a.c}"><i class="sev"></i><div><b>${Util.esc(a.t)}</b><p>${Util.esc(a.p)}</p></div></li>`).join('')}</ul>` : '';
 
-      $('#fs-sub').textContent = `${f.ventas.length} ventas · ${f.divs.length} dividendos`;
+      $('#fs-sub').textContent = `${f.ventas.length} ventas · ${f.divs.length} dividendos${f.ints.length ? ` · ${f.ints.length} pagos de intereses` : ''}`;
       const fila = (et, v, o) => `<tr class="${(o || {}).fuerte ? '' : ''}">
         <td>${(o || {}).sangria ? '<span class="mut">· </span>' : ''}${et}</td>
-        <td class="r num ${(o || {}).clase || ''}">${(o || {}).fuerte ? '<b>' : ''}${Util.eur(v, 0)}${(o || {}).fuerte ? '</b>' : ''}</td></tr>`;
+        <td class="r num ${(o || {}).clase || ''}">${(o || {}).fuerte ? '<b>' : ''}${Util.eur(v, 2)}${(o || {}).fuerte ? '</b>' : ''}</td></tr>`;
       $('#tbl-liquidacion').innerHTML = `
         <thead><tr><th>Concepto</th><th class="r">Importe</th></tr></thead>
         <tbody>
@@ -5627,8 +5661,9 @@ const Vistas = (() => {
           ${f.aBolsa ? fila('Pérdida que se guarda para los próximos cuatro años', -f.aBolsa, { sangria: true }) : ''}
           ${fila('Base por ganancias patrimoniales', f.baseGP, { fuerte: true })}
           ${fila('Dividendos brutos', f.divBruto, {})}
-          ${f.compensadoRCM ? fila('Pérdidas absorbidas por dividendos (tope del 25 %)', -f.compensadoRCM, { sangria: true, clase: 'pos' }) : ''}
-          ${fila('Base por dividendos', f.baseRCM, { fuerte: true })}
+          ${f.intBruto ? fila('Intereses de cuentas, brutos', f.intBruto, {}) : ''}
+          ${f.compensadoRCM ? fila(`Pérdidas absorbidas por ${f.intBruto ? 'dividendos e intereses' : 'dividendos'} (tope del 25 %)`, -f.compensadoRCM, { sangria: true, clase: 'pos' }) : ''}
+          ${fila(f.intBruto ? 'Base por dividendos e intereses' : 'Base por dividendos', f.baseRCM, { fuerte: true })}
           ${fila('Base del ahorro', f.base, { fuerte: true })}
           ${fila('Cuota estimada', f.cuota, { fuerte: true })}
           ${fila('Retenciones ya practicadas', -f.retenido, { clase: 'pos' })}
@@ -5662,21 +5697,26 @@ const Vistas = (() => {
           </tr>`;
         }).join('') : `<tr><td colspan="7" class="vacio">Ninguna venta este ejercicio.</td></tr>`}</tbody>`;
 
+      /* Dividendos e intereses juntos, por fecha: tributan igual */
+      const rcm = [
+        ...f.divs.map(o => { const a = Store.activo(o.activoId);
+          return { fecha: o.fecha, que: a ? Util.esc(a.ticker) : '—', sub: 'dividendo', bruto: o.importe, ret: o.retencion }; }),
+        ...f.ints.map(i => ({ fecha: i.fecha, que: 'Intereses', sub: Util.esc(i.cuenta || 'cuenta'), bruto: Util.n(i.importe), ret: Util.n(i.retencion) }))
+      ].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+      const totB = f.divBruto + f.intBruto, totR = f.divRet + f.intRet;
       $('#tbl-fiscal-divs').innerHTML = `
-        <thead><tr><th>Fecha</th><th>Activo</th><th class="r">Bruto</th><th class="r">Retención</th><th class="r">Neto</th></tr></thead>
-        <tbody>${f.divs.length ? f.divs.map(o => {
-          const a = Store.activo(o.activoId);
-          return `<tr><td class="nowrap">${Util.fecha(o.fecha)}</td>
-            <td class="tick">${a ? Util.esc(a.ticker) : '—'}</td>
-            <td class="r num">${Util.eur(o.importe, 2)}</td>
-            <td class="r num">${Util.eur(o.retencion, 2)}</td>
-            <td class="r num">${Util.eur(o.importe - o.retencion, 2)}</td></tr>`;
-        }).join('') : `<tr><td colspan="5" class="vacio">Ningún dividendo este ejercicio.</td></tr>`}
+        <thead><tr><th>Fecha</th><th>Qué</th><th class="r">Bruto</th><th class="r">Retención</th><th class="r">Neto</th></tr></thead>
+        <tbody>${rcm.length ? rcm.map(x => `<tr><td class="nowrap">${Util.fecha(x.fecha)}</td>
+            <td class="tick">${x.que}<small>${x.sub}</small></td>
+            <td class="r num">${Util.eur(x.bruto, 2)}</td>
+            <td class="r num">${Util.eur(x.ret, 2)}</td>
+            <td class="r num">${Util.eur(x.bruto - x.ret, 2)}</td></tr>`).join('')
+          : `<tr><td colspan="5" class="vacio">Ningún dividendo ni interés este ejercicio.</td></tr>`}
         </tbody>
-        ${f.divs.length ? `<tfoot><tr><td colspan="2">Total</td>
-          <td class="r num">${Util.eur(f.divBruto, 2)}</td>
-          <td class="r num">${Util.eur(f.divRet, 2)}</td>
-          <td class="r num">${Util.eur(f.divBruto - f.divRet, 2)}</td></tr></tfoot>` : ''}`;
+        ${rcm.length ? `<tfoot><tr><td colspan="2">Total${f.intBruto ? ` <span class="small mut">(dividendos ${Util.eur(f.divBruto, 2)} · intereses ${Util.eur(f.intBruto, 2)})</span>` : ''}</td>
+          <td class="r num">${Util.eur(totB, 2)}</td>
+          <td class="r num">${Util.eur(totR, 2)}</td>
+          <td class="r num">${Util.eur(totB - totR, 2)}</td></tr></tfoot>` : ''}`;
 
       $('#fs-ano').onchange = () => { ano = $('#fs-ano').value; render(); };
       $('#fs-min').onchange = () => { Store.ajustes().minusvaliasPendientes = Util.n($('#fs-min').value); Store.save(); };
@@ -5695,6 +5735,10 @@ const Vistas = (() => {
       f.divs.forEach(o => {
         const a = Store.activo(o.activoId);
         L.push(['Dividendo', o.fecha, a ? a.ticker : '', '', o.importe.toFixed(2), '', (o.importe - o.retencion).toFixed(2), 'retencion ' + o.retencion.toFixed(2)]
+          .join(';').replace(/\./g, ','));
+      });
+      (f.ints || []).forEach(i => {
+        L.push(['Intereses', i.fecha, i.cuenta || 'cuenta', '', Util.n(i.importe).toFixed(2), '', (Util.n(i.importe) - Util.n(i.retencion)).toFixed(2), 'retencion ' + Util.n(i.retencion).toFixed(2)]
           .join(';').replace(/\./g, ','));
       });
       Util.bajar(`fiscal_${f.ano}.csv`, '\ufeff' + L.join('\n'), 'text/csv');
@@ -6446,6 +6490,7 @@ const Vistas = (() => {
 <script src="./catalogo.js"></script>
 <script src="./estudio.js"></script>
 <script src="./papel.js"></script>
+<script src="./brokers.js"></script>
 <script>
 /* ═══════════════ FICHA DEL ACTIVO ═══════════════ */
 const Ficha = (() => {
@@ -7000,7 +7045,9 @@ const Ops = (() => {
 
   /* CSV con cabecera: ticker;tipo;fecha;titulos;precio;comision;importe;retencion;motivo */
   function importarCSV() {
-    Util.leerArchivo('.csv,.txt', txt => {
+    Util.leerArchivo('.csv,.txt', (txt, nombre) => {
+      /* Un extracto de bróker (Trade Republic…) va por su importador */
+      if (typeof Brokers !== 'undefined' && Brokers.reconoce(txt)) { Brokers.importar(txt, nombre); return; }
       const lineas = txt.split(/\r?\n/).filter(l => l.trim());
       if (lineas.length < 2) { Util.toast('El archivo está vacío', 'err'); return; }
       const sep = lineas[0].includes(';') ? ';' : ',';
@@ -7153,6 +7200,8 @@ const Datos = (() => {
   }
 
   function cargarTexto(txt, nombre) {
+    /* Si alguien abre aquí el extracto del bróker, se lleva a su sitio */
+    if (typeof Brokers !== 'undefined' && Brokers.reconoce(txt)) { Brokers.importar(txt, nombre); return; }
     let d; try { d = JSON.parse(txt); } catch (e) { Util.toast('Ese archivo no es un JSON válido', 'err'); return; }
       const pv = Store.previsualizar(d);
       const reales = pv.cambios.filter(c => c.clase !== 'igual');

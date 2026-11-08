@@ -423,3 +423,72 @@ GRÁFICOS LEGIBLES EN EL MÓVIL Y ESTRATEGIAS FRENTE A FRENTE
   La estrella marca la mejor en cada indicador que tiene un «mejor»
   claro. Los que no lo tienen (operaciones al año, días en cartera)
   se enseñan sin estrella.
+
+
+==============================================================
+IMPORTAR DE TRADE REPUBLIC
+==============================================================
+
+ARCHIVO NUEVO
+
+  brokers.js   Lee el extracto de tu bróker y lo convierte en
+               operaciones. Súbelo junto a los demás.
+
+CÓMO SE USA
+
+  1. En la app de Trade Republic: Perfil → Extractos → Exportar
+     transacciones. Mejor desde el primer día que tengas.
+  2. En la consola: Operaciones → «Importar del bróker o CSV» y
+     elige el archivo.
+  3. Te enseña qué entra antes de tocar nada. Repasa los tickers de
+     los valores nuevos y pulsa «Importar».
+
+  Vale el archivo tal como sale de Trade Republic y también si lo has
+  abierto y guardado con Excel o Numbers (que le añade comillas). Si
+  lo abres por error desde Ajustes o lo pegas en Cribado, lo reconoce
+  y lo lleva a su sitio.
+
+QUÉ HACE CON CADA COSA
+
+  Compras y ventas    a Operaciones, con su comisión. El coste sale
+                      de lo que te cobraron, al céntimo.
+  Planes de inversión como compras, anotadas como plan.
+  Saveback            como compra, con una nota: fiscalmente esas
+                      acciones regaladas son un rendimiento.
+  Dividendos          con su retención y lo cobrado en la divisa de
+                      origen anotado.
+  Intereses           a Fiscal, no a la cartera: no son ningún valor,
+                      pero tributan como los dividendos.
+  Transferencias      se dejan fuera: es dinero que entra o sale.
+  Lo que no entienda  se enseña y no se importa. Pásame esas líneas
+                      y le enseño a entenderlas.
+
+  Los valores nuevos se identifican por ISIN. El ticker se propone
+  de la lista cuando lo encuentra; si no, unas iniciales marcadas
+  como «inventado» para que las cambies.
+
+SIN DUPLICADOS
+
+  Cada movimiento guarda el identificador de Trade Republic. Puedes
+  importar cada mes el historial completo: solo entra lo nuevo.
+  Y como siempre, se puede deshacer justo después.
+
+DIVIDENDOS SIN SU COMPRA
+
+  Si el extracto empieza después de haber comprado algo, verás sus
+  dividendos pero no la compra. Se importan igual, y en Cartera
+  sale un botón para apuntar esa compra. Mejor: exporta el
+  historial completo y vuelve a importarlo.
+
+LO QUE CAMBIÓ EN FISCAL
+
+  Los intereses de cuentas suman con los dividendos en la base del
+  ahorro, entran en el tope del 25 % para absorber pérdidas y su
+  retención se descuenta. La tabla pasa a llamarse «Dividendos e
+  intereses» y el informe exportado los incluye.
+
+  Ojo: la retención de dividendos extranjeros (la de Estados Unidos,
+  por ejemplo) no es una retención española, sino una deducción por
+  doble imposición con su propio límite. El programa las suma como
+  si fueran lo mismo: para la declaración, la cifra buena es la del
+  informe fiscal de Trade Republic.

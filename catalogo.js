@@ -429,7 +429,8 @@ const VALORES = (() => {
 ['AVB','AvalonBay Communities','accion','NYSE'],['VICI','VICI Properties','accion','NYSE'],
 ['GM','General Motors','accion','NYSE'],['F','Ford Motor','accion','NYSE'],
 ['BA','Boeing','accion','NYSE'],['LUV','Southwest Airlines','accion','NYSE'],
-['DAL','Delta Air Lines','accion','NYSE'],['UAL','United Airlines Holdings','accion','Nasdaq'],
+['DAL','Delta Air Lines','accion','NYSE'],['RCL','Royal Caribbean Cruises','accion','NYSE'],
+['CCL','Carnival','accion','NYSE'],['NCLH','Norwegian Cruise Line Holdings','accion','NYSE'],['UAL','United Airlines Holdings','accion','Nasdaq'],
 ['UBER','Uber Technologies','accion','NYSE'],['ABNB','Airbnb','accion','Nasdaq'],
 ['DASH','DoorDash','accion','Nasdaq'],['SHOP','Shopify','accion','NYSE'],
 ['SQ','Block','accion','NYSE'],['COIN','Coinbase Global','accion','Nasdaq'],
@@ -632,9 +633,12 @@ const VALORES = (() => {
       else if (t.length >= 2 && tk.includes(t)) p = 4;
       else if (t.length >= 3 && trozos.every(w => nb.includes(w) || tk.includes(w))) p = 5;
       if (p < 0) return;
-      out.push(Object.assign({ p, tengo: yaTengo.has(tk) }, x));
+      /* A igualdad, gana quien tiene más palabras enteras iguales: «alphabet a»
+         es la clase A, aunque la «a» también sea el principio de «alphabet» */
+      const enteras = trozos.filter(w => palabras.includes(w)).length;
+      out.push(Object.assign({ p, enteras, tengo: yaTengo.has(tk) }, x));
     });
-    out.sort((a, b) => a.p - b.p || a.ticker.length - b.ticker.length || a.nombre.localeCompare(b.nombre));
+    out.sort((a, b) => a.p - b.p || b.enteras - a.enteras || a.ticker.length - b.ticker.length || a.nombre.localeCompare(b.nombre));
     const lista = out.slice(0, tope || 12);
     lista.total = out.length;
     return lista;
