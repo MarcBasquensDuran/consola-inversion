@@ -111,6 +111,9 @@ a{color:var(--c-accent)}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:var(--c-border-strong);border-radius:8px;border:3px solid var(--c-bg)}
 
+/* Que el navegador no recoloque la página cuando la cabecera cambia de alto:
+   eso, sumado al encogido de la cabecera, la hacía temblar en el móvil */
+html{overflow-anchor:none}
 /* ---------- Cabecera ---------- */
 .topbar{position:sticky;top:0;z-index:60;background:var(--c-surface);
   border-bottom:1px solid var(--c-border);box-shadow:var(--sh-1);
@@ -159,17 +162,13 @@ body.hdr-fuera .tabs{top:0}
 .tab.on{color:var(--c-ink);border-bottom-color:var(--tc,var(--c-accent))}
 /* Cada sección tiene su color en el subrayado y en el punto de la izquierda */
 .tab[data-tab="semaforo"]{--tc:var(--v-vender)}
-.tab[data-tab="panel"]{--tc:var(--g1)}
-.tab[data-tab="rendimiento"]{--tc:var(--g2)}
 .tab[data-tab="cartera"]{--tc:var(--g1)}
-.tab[data-tab="cribado"]{--tc:var(--g4)}
-.tab[data-tab="manual"]{--tc:var(--g3)}
-.tab[data-tab="filosofia"]{--tc:var(--g3)}
+.tab[data-tab="analisis"]{--tc:var(--g2)}
 .tab[data-tab="seguimiento"]{--tc:var(--g5)}
-.tab[data-tab="datos"]{--tc:var(--g5)}
+.tab[data-tab="cribado"]{--tc:var(--g4)}
 .tab[data-tab="operaciones"]{--tc:var(--g2)}
 .tab[data-tab="fiscal"]{--tc:var(--g6)}
-.tab[data-tab="papel"]{--tc:var(--g4)}
+.tab[data-tab="metodo"]{--tc:var(--g3)}
 .tab[data-tab="ajustes"]{--tc:var(--c-muted)}
 .tab::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--tc,var(--c-muted));
   display:inline-block;margin-right:7px;opacity:.38;transition:opacity var(--t)}
@@ -245,6 +244,8 @@ td input,td select{padding:4px 7px;font-size:12.5px}
 .pill.neutro{background:var(--c-surface-2);color:var(--c-ink-soft);border-color:var(--c-border-strong)}
 .pill.comprar{background:var(--v-mantener-bg);color:var(--v-mantener);border-color:var(--v-mantener-bd)}
 tr.sel td{background:var(--c-accent-soft)}
+tr.ref td{color:var(--c-muted);background:var(--c-surface-2);font-style:normal}
+tr.ref .tick{color:var(--c-ink-soft)}
 .corona{font-style:normal;color:var(--g4,#c9a227)}
 .pill.tipo{background:var(--c-accent-soft);color:var(--c-accent);border-color:transparent;font-weight:560}
 /* Un color por clase de activo, para leer la tabla de un vistazo */
@@ -348,6 +349,7 @@ tr.sel td{background:var(--c-accent-soft)}
 .ov{position:fixed;inset:0;background:rgba(10,14,14,.55);backdrop-filter:blur(2px);
   display:none;align-items:flex-start;justify-content:center;z-index:100;padding:24px;overflow:auto}
 .ov.open{display:flex}
+body.modal-abierto{overflow:hidden}
 .modal{background:var(--c-surface);border-radius:var(--r-l);box-shadow:var(--sh-3);
   width:100%;max-width:620px;margin:auto;overflow:hidden}
 .modal.wide{max-width:1080px}
@@ -455,19 +457,142 @@ tr.vg.falla td{background:color-mix(in srgb, var(--v-vender) calc((1 - var(--vs,
 .pesos-caja .fila span.nb{flex:1;font-size:12.5px}
 .pesos-caja input[type=range]{flex:1.4;min-width:90px}
 .pesos-caja b{width:34px;text-align:right;font-variant-numeric:tabular-nums;font-size:12.5px}
-/* Buscador del catálogo de valores */
-.buscador{position:relative}
-.sugerencias{position:absolute;left:0;right:0;top:100%;z-index:40;margin-top:4px;display:none;
-  background:var(--c-surface);border:1px solid var(--c-border-strong);border-radius:var(--r);
-  box-shadow:0 10px 28px rgba(0,0,0,.16);max-height:280px;overflow:auto}
-.sug{display:flex;align-items:baseline;gap:9px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--c-border)}
+
+/* ═══════════ Pestañas fusionadas: bloques con barra propia ═══════════ */
+.subnav{position:sticky;top:var(--subnav-top,96px);z-index:50;display:flex;gap:6px;overflow-x:auto;
+  scrollbar-width:none;padding:8px 2px;margin:-4px 0 10px;background:var(--c-bg);
+  border-bottom:1px solid var(--c-border)}
+.subnav::-webkit-scrollbar{display:none}
+.subnav button{flex:none;border:1px solid var(--c-border-strong);background:var(--c-surface);color:var(--c-ink-soft);
+  border-radius:99px;padding:6px 13px;font-size:12.5px;font-weight:560;cursor:pointer;white-space:nowrap}
+.subnav button.on{background:var(--c-ink);border-color:var(--c-ink);color:var(--c-surface)}
+.bloque-sec{scroll-margin-top:calc(var(--subnav-top,96px) + 56px)}
+.bloque-sec + .bloque-sec{margin-top:26px}
+/* El último bloque tiene que poder subir hasta la barra al pulsar su botón */
+.bloque-sec:last-child{min-height:calc(100vh - var(--subnav-top,96px) - 70px)}
+.sec-t{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--c-muted);
+  margin:4px 2px 10px;display:flex;align-items:center;gap:10px}
+.sec-t::after{content:'';flex:1;height:1px;background:var(--c-border)}
+
+/* ═══════════ Cartera: real o de papel ═══════════ */
+.modo-cartera{display:grid;grid-template-columns:1fr 1fr;gap:0;max-width:440px;margin:0 0 14px;
+  border:1px solid var(--c-border-strong);border-radius:var(--r);overflow:hidden;background:var(--c-surface)}
+.modo-cartera button{border:0;background:none;padding:10px 12px;font-size:14px;font-weight:620;cursor:pointer;
+  color:var(--c-ink-soft);display:flex;align-items:center;justify-content:center;gap:7px}
+.modo-cartera button small{font-weight:500;font-size:11.5px;opacity:.8}
+.modo-cartera button[data-modo="real"].on{background:var(--c-accent);color:#fff}
+[data-theme="dark"] .modo-cartera button[data-modo="real"].on{color:#101413}
+.modo-cartera button[data-modo="papel"]{border-left:1px solid var(--c-border-strong)}
+.modo-cartera button[data-modo="papel"].on{background:var(--papel-fuerte);color:#fff}
+
+/* El mundo de papel: color, rayado y marca de agua. Tres señales a la vez,
+   para que no dependa solo del color (sol en la pantalla, modo oscuro) */
+:root{--papel-fondo:#f3e6c9;--papel-raya:rgba(150,100,10,.09);--papel-tarjeta:#fffaf0;
+  --papel-borde:#d9b979;--papel-fuerte:#9a6400;--papel-agua:rgba(150,100,10,.11)}
+[data-theme="dark"]{--papel-fondo:#2e2616;--papel-raya:rgba(230,180,80,.07);--papel-tarjeta:#231e14;
+  --papel-borde:#6b5326;--papel-fuerte:#c98d16;--papel-agua:rgba(230,180,80,.08)}
+.papel-mundo{position:relative;border-radius:var(--r-l);padding:12px;border:2px dashed var(--papel-borde);
+  background-color:var(--papel-fondo);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='340' height='200'%3E%3Ctext x='20' y='130' transform='rotate(-22 170 100)' font-family='Arial,sans-serif' font-size='34' font-weight='700' letter-spacing='4' fill='%23966400' fill-opacity='0.11'%3ESIMULACI%C3%93N%3C/text%3E%3C/svg%3E"),
+    repeating-linear-gradient(135deg,transparent 0 16px,var(--papel-raya) 16px 32px)}
+.papel-mundo .card{background:var(--papel-tarjeta);border-color:var(--papel-borde)}
+.papel-mundo .card-h{border-bottom-color:var(--papel-borde)}
+.papel-mundo .btn.pri{background:var(--papel-fuerte);border-color:var(--papel-fuerte);color:#fff}
+.papel-aviso{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--papel-fuerte);color:#fff;
+  border-radius:var(--r);padding:10px 14px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.14)}
+.papel-aviso b{font-size:13.5px}
+.papel-aviso span{flex:1;min-width:160px;opacity:.95}
+.papel-aviso .btn{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.5);color:#fff}
+.papel-arriba{position:sticky;top:calc(var(--subnav-top,96px) + 6px);z-index:45;margin-bottom:12px}
+.papel-abajo{margin-top:14px}
+/* La cabecera enseña siempre la real: mientras miras el papel, que lo diga */
+body.en-papel .topbar .hdr-metrics::before{content:'Tu cartera real';align-self:center;justify-self:start;grid-column:1/-1;flex:none;width:max-content;font-size:11px;font-weight:650;
+  color:var(--c-accent);border:1px solid currentColor;border-radius:99px;padding:2px 9px;white-space:nowrap}
+/* Las ventanas de comprar y vender en papel llevan el mismo fondo */
+.modal.papel .modal-h{background:var(--papel-fuerte);color:#fff;border-bottom-color:var(--papel-fuerte)}
+.modal.papel .modal-h .x,.modal.papel .modal-h button{color:#fff}
+.modal.papel .modal-b{background-color:var(--papel-fondo);
+  background-image:repeating-linear-gradient(135deg,transparent 0 16px,var(--papel-raya) 16px 32px)}
+.modal.papel .modal-f{background:var(--papel-tarjeta);border-top-color:var(--papel-borde)}
+.modal.papel .btn.pri{background:var(--papel-fuerte);border-color:var(--papel-fuerte);color:#fff}
+.btn.btn-papel{border-color:var(--papel-borde);background:var(--papel-tarjeta);color:var(--papel-fuerte)}
+.papel-sello{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:#fff;background:var(--papel-fuerte);border-radius:99px;padding:2px 8px;margin-right:6px;vertical-align:middle}
+@media (max-width:760px){
+  .modo-cartera{max-width:none}
+  .papel-mundo{padding:8px;margin:0 -6px}
+  .subnav{margin-left:-2px;margin-right:-2px}
+}
+
+
+/* Estrategias de papel en Análisis */
+.papel-cmp{border:2px dashed var(--papel-borde);background:var(--papel-tarjeta);border-radius:var(--r);
+  padding:10px 12px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px}
+.papel-cmp.vacio-cmp{flex-direction:row;align-items:center;gap:10px}
+.papel-cmp-t{font-size:13px;font-weight:620;display:flex;align-items:center;gap:4px}
+.papel-cmp-desde{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.papel-cmp-desde select{width:auto}
+.chip.chip-papel{border-style:dashed}
+.punto-serie{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle}
+tr.fila-papel td{background:var(--papel-tarjeta)}
+.tbl-cmp td.num{white-space:nowrap}
+@media (max-width:760px){
+  /* Con todas desde la misma fecha, la columna «Desde» repetiría lo mismo */
+  .tbl-cmp.comun .c-desde{display:none}
+  .tbl-cmp td,.tbl-cmp th{padding-left:6px;padding-right:6px}
+  .tbl-cmp .papel-sello{font-size:9.5px;padding:1px 5px}
+}
+.contrib-papel{margin-top:16px;padding-top:12px;border-top:2px dashed var(--papel-borde)}
+.contrib-papel-t{font-weight:620;font-size:13px;margin-bottom:6px}
+
+
+/* Estrategias frente a frente: barras en HTML, legibles igual en el móvil */
+.fi-grupo + .fi-grupo{margin-top:20px;padding-top:14px;border-top:1px solid var(--c-border)}
+.fi-gt{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--c-muted);margin-bottom:10px}
+.fi-gt small{display:block;text-transform:none;letter-spacing:0;font-weight:500;font-size:12px;margin-top:2px}
+.fi-ind{margin:0 0 16px}
+.fi-n{font-weight:640;font-size:14px;margin-bottom:6px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.fi-n small{font-weight:500;font-size:11.5px;color:var(--c-muted)}
+.fi-fila{display:grid;grid-template-columns:minmax(120px,1.1fr) 2fr minmax(78px,auto);gap:10px;align-items:center;padding:3px 0}
+.fi-q{font-size:13px;display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fi-q i{width:9px;height:9px;border-radius:50%;flex:none}
+.fi-q .papel-sello{margin:0;padding:1px 5px;font-size:9.5px}
+.fi-barra{height:12px;background:var(--c-surface-2);border-radius:99px;overflow:hidden}
+.fi-barra b{display:block;height:100%;border-radius:99px}
+.fi-fila.es-papel .fi-barra b{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.35) 0 4px,transparent 4px 8px)}
+.fi-v{font-variant-numeric:tabular-nums;font-size:13px;text-align:right;white-space:nowrap}
+.fi-v small{display:block;font-size:11px;color:var(--c-muted)}
+.fi-v.mejor{font-weight:700}
+.fi-nota{font-size:12px;color:var(--c-muted);margin:4px 0 0}
+@media (max-width:760px){
+  .fi-fila{grid-template-columns:1fr auto;grid-template-areas:'q v' 'b b';gap:2px 10px;padding:5px 0}
+  .fi-q{grid-area:q;font-size:13.5px}.fi-v{grid-area:v;font-size:13.5px}.fi-barra{grid-area:b;height:10px}
+}
+
+/* Buscador del catálogo de valores. La lista va DENTRO del flujo, debajo
+   del campo: flotando se cortaba contra el borde del formulario en el móvil */
+.sugerencias{display:none;margin-top:6px;border:1px solid var(--c-border-strong);border-radius:var(--r);
+  background:var(--c-surface);box-shadow:0 6px 18px rgba(0,0,0,.10);max-height:min(46vh,340px);
+  overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.sugerencias.on{display:block}
+.sug{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 12px;
+  background:none;border:0;border-bottom:1px solid var(--c-border);cursor:pointer;color:inherit;font:inherit;
+  min-height:48px}
 .sug:last-child{border-bottom:0}
-.sug:hover,.sug.on{background:var(--c-surface-2)}
-.sug b{font-variant-numeric:tabular-nums;min-width:62px;flex:none}
-.sug span{flex:1;font-size:13px}
-.sug em{font-style:normal;font-size:11.5px;color:var(--c-muted);flex:none}
+.sug:hover,.sug.on,.sug:active{background:var(--c-surface-2)}
+.sug b{font-variant-numeric:tabular-nums;min-width:58px;flex:none;font-size:13px}
+.sug span{flex:1;font-size:13.5px;line-height:1.3;min-width:0}
+.sug span em{display:block;font-style:normal;font-size:11.5px;color:var(--c-muted);margin-top:1px}
 .sug i.ya{font-style:normal;font-size:11px;color:var(--c-muted);border:1px solid var(--c-border-strong);
   border-radius:99px;padding:1px 7px;flex:none}
+.sug-nada{padding:10px 12px;font-size:12px;color:var(--c-muted)}
+.mas-datos{margin-top:14px;border-top:1px solid var(--c-border);padding-top:4px}
+.mas-datos summary{cursor:pointer;padding:10px 0;font-weight:600;font-size:13px;color:var(--c-ink-soft);list-style:none}
+.mas-datos summary::-webkit-details-marker{display:none}
+.mas-datos summary::before{content:'▸ ';color:var(--c-muted)}
+.mas-datos[open] summary::before{content:'▾ '}
+.campo-aviso{font-size:12px;margin-top:5px}
 .leyenda-sc{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--c-muted);margin-top:10px}
 .leyenda-sc .barra-sc{width:120px;height:9px;border-radius:5px;
   background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--v-mantener) 62%, transparent))}
@@ -531,6 +656,7 @@ tr.vg.falla td{background:color-mix(in srgb, var(--v-vender) calc((1 - var(--vs,
 
 /* ---------- Gráficos ---------- */
 .chart{width:100%;height:auto;overflow:visible;display:block}
+@media (max-width:760px){.chart.donut{max-width:210px;margin:0 auto}}
 .chart text{font-family:var(--ff)}
 .leyenda{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--c-ink-soft)}
 .leyenda span{display:inline-flex;align-items:center;gap:6px}
@@ -611,11 +737,15 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
   .btn.mini{padding:5px 9px}
 
   /* Modal a pantalla completa: más sitio y menos toque fino */
-  .ov{padding:0;align-items:stretch}
-  .modal,.modal.wide{max-width:100%;width:100%;min-height:100%;border-radius:0;margin:0}
-  .modal-h{position:sticky;top:0;z-index:2;padding:12px 14px}
-  .modal-b{padding:14px;max-height:none}
-  .modal-f{position:sticky;bottom:0;padding:11px 14px}
+  /* Cabecera y pie fijos, y SOLO el cuerpo hace scroll. Antes el modal se
+     estiraba a la pantalla y cortaba lo que sobraba: no se podía bajar */
+  .ov{padding:0;align-items:stretch;overflow:hidden}
+  .modal,.modal.wide{max-width:100%;width:100%;height:100%;height:100dvh;border-radius:0;margin:0;
+    display:flex;flex-direction:column}
+  .modal-h{flex:none;padding:12px 14px}
+  .modal-b{flex:1 1 auto;min-height:0;padding:14px 14px 28px;max-height:none;overflow-y:auto;
+    overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  .modal-f{flex:none;padding:11px 14px calc(11px + env(safe-area-inset-bottom))}
   .modal-f .btn{flex:1 1 auto;justify-content:center}
 
   table{font-size:12.5px}
@@ -680,17 +810,13 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
 <nav class="tabs no-print">
   <div class="tabs-in" id="tabs">
     <button class="tab on" data-tab="semaforo">Semáforo <span class="cnt" id="cnt-alertas">0</span></button>
-    <button class="tab" data-tab="panel">Panel</button>
-    <button class="tab" data-tab="rendimiento">Rendimiento</button>
     <button class="tab" data-tab="cartera">Cartera</button>
-    <button class="tab" data-tab="cribado">Cribado</button>
-    <button class="tab" data-tab="manual">Manual</button>
-    <button class="tab" data-tab="filosofia">Filosofía</button>
+    <button class="tab" data-tab="analisis">Análisis</button>
     <button class="tab" data-tab="seguimiento">Seguimiento <span class="cnt" id="cnt-novedades">0</span></button>
-    <button class="tab" data-tab="datos">Histórico</button>
+    <button class="tab" data-tab="cribado">Cribado</button>
     <button class="tab" data-tab="operaciones">Operaciones</button>
-    <button class="tab" data-tab="papel">Papel</button>
     <button class="tab" data-tab="fiscal">Fiscal</button>
+    <button class="tab" data-tab="metodo">Método</button>
     <button class="tab" data-tab="ajustes">Ajustes</button>
   </div>
 </nav>
@@ -730,48 +856,92 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
 
     <div class="card no-print">
       <div class="card-b small mut">
-        Los umbrales de cada regla se editan en <b>Filosofía</b>. El programa no decide por ti:
+        Los umbrales de cada regla se editan en <b>Método → Mis reglas</b>. El programa no decide por ti:
         aplica tus propias reglas a los datos que has metido y te dice cuál has incumplido.
       </div>
     </div>
   </section>
 
-  <!-- ══════════════ PANEL ══════════════ -->
-  <section class="panel" data-panel="panel">
+  <!-- ══════════════ ANÁLISIS (panel + rendimiento) ══════════════ -->
+  <section class="panel" data-panel="analisis">
+    <nav class="subnav no-print"><button data-bloque="an-resultado">Resultado</button><button data-bloque="an-origen">De dónde sale</button><button data-bloque="an-composicion">Composición</button><button data-bloque="an-valoracion">Valoración</button></nav>
+    <div class="bloque-sec" id="an-resultado">
+      <h2 class="sec-t">Resultado</h2>
+    <div class="card no-print">
+      <div class="card-b">
+        <div class="toolbar">
+          <div class="field" style="min-width:260px"><label for="rd-ref">Con qué me comparo</label>
+            <select id="rd-ref"></select></div>
+          <div class="small mut" style="flex:1;margin-top:16px">
+            La pregunta que decide si todo esto merece la pena: ¿bate tu selección a comprar el índice y olvidarte?
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="an-papel" class="no-print"></div>
+    <div id="rd-avisos"></div>
+    <div id="rd-kpis"></div>
+    <div class="card">
+      <div class="card-h"><h3>Tu cartera frente al índice</h3>
+        <div class="sub" id="rd-sub">Base 100 al inicio del periodo comparable</div></div>
+      <div class="card-b"><div id="rd-curva"></div></div>
+    </div>
+    <div class="card" id="an-cmp-card" hidden>
+      <div class="card-h"><h3><span class="papel-sello">Papel</span>Estrategias frente a frente</h3>
+        <div class="sub">Indicador a indicador, solo donde la comparación tiene sentido</div></div>
+      <div class="card-b" id="an-cmp"></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>El mismo dinero, los mismos días, en el índice</h3>
+        <div class="sub">Réplica exacta de tus aportaciones sobre la referencia</div></div>
+      <div class="card-b"><div id="rd-replica"></div></div>
+    </div>
     <div class="card">
       <div class="card-h"><h3>Lo que vale frente a lo que has metido</h3>
         <div class="sub" id="g-evo-sub"></div></div>
       <div class="card-b"><div id="g-evolucion"></div></div>
     </div>
-
+    </div>
+    <div class="bloque-sec" id="an-origen">
+      <h2 class="sec-t">De dónde sale</h2>
     <div class="grid-2">
       <div class="card">
-        <div class="card-h"><h3>Peso de cada posición</h3><div class="sub">La línea es tu tope</div></div>
-        <div class="card-b"><div id="g-pesos"></div></div>
+        <div class="card-h"><h3>Quién aporta el resultado</h3>
+          <div class="sub">Latente, realizado y dividendos, en euros</div></div>
+        <div class="card-b"><div id="rd-contrib"></div></div>
       </div>
       <div class="card">
-        <div class="card-h"><h3>Ganancia latente por posición</h3><div class="sub">Sobre el coste medio</div></div>
-        <div class="card-b"><div id="g-latente"></div></div>
+        <div class="card-h"><h3>Desglose por posición</h3></div>
+        <div class="card-b tight tbl-wrap"><table id="tbl-contrib"></table></div>
       </div>
     </div>
-
+    </div>
+    <div class="bloque-sec" id="an-composicion">
+      <h2 class="sec-t">Composición</h2>
+    <div class="card">
+      <div class="card-h"><h3>Peso de cada posición</h3><div class="sub">La línea es tu tope</div></div>
+      <div class="card-b"><div id="g-pesos"></div></div>
+    </div>
     <div class="grid-2">
       <div class="card">
-        <div class="card-h"><h3>Reparto por sector</h3></div>
+        <div class="card-h"><h3>Reparto por sector</h3><div class="sub">Tope por sector en Método</div></div>
         <div class="card-b"><div id="g-sectores"></div></div>
+        <div class="card-b tight tbl-wrap"><table id="tbl-sectores"></table></div>
       </div>
       <div class="card">
         <div class="card-h"><h3>Reparto por tipo de activo</h3></div>
         <div class="card-b"><div id="g-tipos"></div></div>
+        <div class="card-b tight tbl-wrap"><table id="tbl-tipos"></table></div>
       </div>
     </div>
-
+    </div>
+    <div class="bloque-sec" id="an-valoracion">
+      <h2 class="sec-t">Valoración y salud</h2>
     <div class="card">
       <div class="card-h"><h3>Calidad frente a precio</h3>
         <div class="sub">Arriba a la izquierda: negocios buenos que además están baratos</div></div>
       <div class="card-b"><div id="g-mapa"></div></div>
     </div>
-
     <div class="grid-2">
       <div class="card">
         <div class="card-h"><h3>Distancia a tu escenario base</h3>
@@ -784,64 +954,21 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
         <div class="card-b"><div id="g-tesis"></div></div>
       </div>
     </div>
-
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-h"><h3>Dividendos cobrados</h3><div class="sub">Netos de retención, por año</div></div>
-        <div class="card-b"><div id="g-dividendos"></div></div>
-      </div>
-      <div class="card">
-        <div class="card-h"><h3>Múltiplo frente a su propia historia</h3>
-          <div class="sub">Dónde cotiza hoy cada empresa dentro de su rango</div></div>
-        <div class="card-b"><div id="g-percentil"></div></div>
-      </div>
+    <div class="card">
+      <div class="card-h"><h3>Dividendos cobrados</h3><div class="sub">Netos de retención, por año</div></div>
+      <div class="card-b"><div id="g-dividendos"></div></div>
+    </div>
     </div>
   </section>
 
-  <!-- ══════════════ RENDIMIENTO ══════════════ -->
-  <section class="panel" data-panel="rendimiento">
-    <div class="card no-print">
-      <div class="card-b">
-        <div class="toolbar">
-          <div class="field" style="min-width:260px"><label for="rd-ref">Con qué me comparo</label>
-            <select id="rd-ref"></select></div>
-          <div class="small mut" style="flex:1;margin-top:16px">
-            La pregunta que decide si todo esto merece la pena: ¿bate tu selección a comprar el índice y olvidarte?
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <div id="rd-avisos"></div>
-    <div id="rd-kpis"></div>
-
-    <div class="card">
-      <div class="card-h"><h3>Tu cartera frente al índice</h3>
-        <div class="sub" id="rd-sub">Base 100 al inicio del periodo comparable</div></div>
-      <div class="card-b"><div id="rd-curva"></div></div>
-    </div>
-
-    <div class="card">
-      <div class="card-h"><h3>El mismo dinero, los mismos días, en el índice</h3>
-        <div class="sub">Réplica exacta de tus aportaciones sobre la referencia</div></div>
-      <div class="card-b"><div id="rd-replica"></div></div>
-    </div>
-
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-h"><h3>Quién aporta el resultado</h3>
-          <div class="sub">Latente, realizado y dividendos, en euros</div></div>
-        <div class="card-b"><div id="rd-contrib"></div></div>
-      </div>
-      <div class="card">
-        <div class="card-h"><h3>Desglose por posición</h3></div>
-        <div class="card-b tight tbl-wrap"><table id="tbl-contrib"></table></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══════════════ CARTERA ══════════════ -->
+  <!-- ══════════════ CARTERA (real y papel) ══════════════ -->
   <section class="panel" data-panel="cartera">
+    <div class="modo-cartera no-print" role="tablist" aria-label="Qué cartera ves">
+      <button role="tab" data-modo="real" class="on">Real</button>
+      <button role="tab" data-modo="papel">Papel <small>imaginaria</small></button>
+    </div>
+    <div id="cartera-real">
     <div class="card">
       <div class="card-h">
         <h3>Posiciones</h3>
@@ -858,18 +985,6 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
       </div>
       <div class="card-b no-print" id="cartera-huerfanos" style="padding-top:0"></div>
     </div>
-
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-h"><h3>Reparto por sector</h3><div class="sub">Tope por sector en Filosofía</div></div>
-        <div class="card-b tight tbl-wrap"><table id="tbl-sectores"></table></div>
-      </div>
-      <div class="card">
-        <div class="card-h"><h3>Reparto por tipo de activo</h3></div>
-        <div class="card-b tight tbl-wrap"><table id="tbl-tipos"></table></div>
-      </div>
-    </div>
-
     <div class="card">
       <div class="card-h">
         <h3>Lista de vigilancia</h3><div class="sub" id="vig-sub">Candidatas sin posición abierta</div>
@@ -889,6 +1004,20 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
         <div id="vig-pesos" style="display:none"></div>
       </div>
       <div class="card-b tight tbl-wrap"><table id="tbl-vigilancia"></table></div>
+    </div>
+    </div>
+    <div id="cartera-papel" class="papel-mundo" hidden>
+      <div class="papel-aviso papel-arriba">
+        <b>Cartera de papel · dinero imaginario</b>
+        <span>No cuenta en tu cartera, ni en el rendimiento, ni en Hacienda.</span>
+        <button class="btn mini" data-modo-ir="real">Volver a la real</button>
+      </div>
+      <div id="papel-zona"></div>
+      <div class="papel-aviso papel-abajo">
+        <b>Fin de la cartera de papel</b>
+        <span>Todo lo de arriba es imaginario.</span>
+        <button class="btn mini" data-modo-ir="real">Volver a la real</button>
+      </div>
     </div>
   </section>
 
@@ -938,25 +1067,12 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
     </div>
   </section>
 
-  <!-- ══════════════ MANUAL ══════════════ -->
-  <section class="panel" data-panel="manual">
-    <div class="manual-wrap">
-      <aside class="manual-idx no-print">
-        <div class="field" style="margin-bottom:10px">
-          <input id="mn-buscar" placeholder="Buscar en el manual">
-        </div>
-        <div id="mn-indice"></div>
-        <div class="toolbar" style="margin-top:14px;flex-direction:column;align-items:stretch">
-          <button class="btn" id="btn-mn-nueva">Añadir ficha</button>
-          <button class="btn" id="btn-mn-pedir">Pedir un paquete</button>
-        </div>
-      </aside>
-      <div class="manual-cont" id="mn-secciones"></div>
-    </div>
-  </section>
 
-  <!-- ══════════════ FILOSOFÍA ══════════════ -->
-  <section class="panel" data-panel="filosofia">
+  <!-- ══════════════ MÉTODO (mis reglas + manual) ══════════════ -->
+  <section class="panel" data-panel="metodo">
+    <nav class="subnav no-print"><button data-bloque="mt-reglas">Mis reglas</button><button data-bloque="mt-manual">Manual</button></nav>
+    <div class="bloque-sec" id="mt-reglas">
+      <h2 class="sec-t">Mis reglas</h2>
     <div class="card">
       <div class="card-h">
         <h3>Principios</h3>
@@ -995,33 +1111,31 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
       </div>
       <div class="card-b tight tbl-wrap"><table id="tbl-reglas"></table></div>
     </div>
+    <p class="small mut" style="margin:4px 2px 0">Los límites, el filtro de compra y las reglas de venta son los que usa el semáforo para avisarte.</p>
+    </div>
+    <div class="bloque-sec" id="mt-manual">
+      <h2 class="sec-t">Manual</h2>
+    <div class="manual-wrap">
+      <aside class="manual-idx no-print">
+        <div class="field" style="margin-bottom:10px">
+          <input id="mn-buscar" placeholder="Buscar en el manual">
+        </div>
+        <div id="mn-indice"></div>
+        <div class="toolbar" style="margin-top:14px;flex-direction:column;align-items:stretch">
+          <button class="btn" id="btn-mn-nueva">Añadir ficha</button>
+          <button class="btn" id="btn-mn-pedir">Pedir un paquete</button>
+        </div>
+      </aside>
+      <div class="manual-cont" id="mn-secciones"></div>
+    </div>
+    </div>
   </section>
 
-  <!-- ══════════════ SEGUIMIENTO ══════════════ -->
+  <!-- ══════════════ SEGUIMIENTO (novedades + indicadores) ══════════════ -->
   <section class="panel" data-panel="seguimiento">
-    <div class="card">
-      <div class="card-h">
-        <h3>Encargo de seguimiento</h3>
-        <div class="sub" id="seg-sub"></div>
-        <div class="toolbar no-print">
-          <button class="btn" id="btn-cargar-informe">Cargar informe</button>
-          <button class="btn pri" id="btn-encargo">Preparar encargo</button>
-        </div>
-      </div>
-      <div class="card-b">
-        <div class="form-grid">
-          <div class="field"><label>Cada cuántos días quiero el informe</label>
-            <input type="number" min="1" id="seg-cadencia"></div>
-          <div class="field"><label>Último informe cargado</label>
-            <input type="date" id="seg-ultimo"></div>
-        </div>
-        <div class="field" style="margin-top:12px"><label>Fuentes que quiero que se usen siempre</label>
-          <textarea id="seg-fuentes" style="min-height:80px"></textarea></div>
-        <p class="small mut" style="margin-top:6px">Este texto viaja dentro del encargo. Lo que más importa no es qué fuente elijas, sino no cambiarla: dos agregadores distintos calculan el PER de forma distinta y el histórico deja de ser comparable.</p>
-        <div id="seg-estado" style="margin-top:12px"></div>
-      </div>
-    </div>
-
+    <nav class="subnav no-print"><button data-bloque="sg-novedades">Novedades</button><button data-bloque="sg-indicadores">Indicadores</button><button data-bloque="sg-archivo">Archivo</button></nav>
+    <div class="bloque-sec" id="sg-novedades">
+      <h2 class="sec-t">Novedades</h2>
     <div class="card">
       <div class="card-h">
         <h3>Novedades</h3>
@@ -1037,15 +1151,39 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
       </div>
       <div class="card-b tight tbl-wrap"><table id="tbl-noticias"></table></div>
     </div>
-
     <div class="card">
-      <div class="card-h"><h3>Informes cargados</h3></div>
-      <div class="card-b tight tbl-wrap"><table id="tbl-informes"></table></div>
+      <div class="card-h">
+        <h3>Encargo de seguimiento</h3>
+        <div class="sub" id="seg-sub"></div>
+        <div class="toolbar no-print">
+          <button class="btn" id="btn-cargar-informe">Cargar informe</button>
+          <button class="btn pri" id="btn-encargo">Preparar encargo</button>
+        </div>
+      </div>
+      <div class="card-b">
+        <details class="mas-datos" style="margin-top:0;border-top:0;padding-top:0">
+        <summary>Cada cuánto y con qué fuentes</summary>
+        <div class="form-grid">
+          <div class="field"><label>Cada cuántos días quiero el informe</label>
+            <input type="number" min="1" id="seg-cadencia"></div>
+          <div class="field"><label>Último informe cargado</label>
+            <input type="date" id="seg-ultimo"></div>
+        </div>
+        <div class="field" style="margin-top:12px"><label>Fuentes que quiero que se usen siempre</label>
+          <textarea id="seg-fuentes" style="min-height:80px"></textarea></div>
+        <p class="small mut" style="margin-top:6px">Este texto viaja dentro del encargo. Lo que más importa no es qué fuente elijas, sino no cambiarla: dos agregadores distintos calculan el PER de forma distinta y el histórico deja de ser comparable.</p>
+        </details>
+        <div id="seg-estado" style="margin-top:12px"></div>
+      </div>
     </div>
-  </section>
-
-  <!-- ══════════════ HISTÓRICO DE DATOS ══════════════ -->
-  <section class="panel" data-panel="datos">
+    </div>
+    <div class="bloque-sec" id="sg-indicadores">
+      <h2 class="sec-t">Indicadores</h2>
+    <div class="card">
+      <div class="card-h"><h3>Todas tus empresas frente a su propia historia</h3>
+        <div class="sub">Dónde cotiza hoy cada una dentro de su rango de múltiplos</div></div>
+      <div class="card-b"><div id="g-percentil"></div></div>
+    </div>
     <div class="card no-print">
       <div class="card-b">
         <div class="toolbar">
@@ -1068,7 +1206,6 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
         </div>
       </div>
     </div>
-
     <div class="grid-2">
       <div class="card">
         <div class="card-h"><h3 id="dt-titulo">Evolución</h3><div class="sub" id="dt-sub"></div></div>
@@ -1080,13 +1217,21 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
         <div class="card-b tight tbl-wrap"><table id="tbl-estadistica"></table></div>
       </div>
     </div>
-
+    </div>
+    <div class="bloque-sec" id="sg-archivo">
+      <h2 class="sec-t">Archivo</h2>
+    <div class="card">
+      <div class="card-h"><h3>Informes cargados</h3></div>
+      <div class="card-b tight tbl-wrap"><table id="tbl-informes"></table></div>
+    </div>
     <div class="card">
       <div class="card-h"><h3>Tomas guardadas</h3>
         <div class="sub" id="dt-tomas-sub"></div></div>
       <div class="card-b tight tbl-wrap"><table id="tbl-tomas"></table></div>
     </div>
+    </div>
   </section>
+
 
   <!-- ══════════════ OPERACIONES ══════════════ -->
   <section class="panel" data-panel="operaciones">
@@ -1165,10 +1310,6 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
   </section>
 
   <!-- ══════════════ AJUSTES ══════════════ -->
-  <!-- ══════════════ CARTERAS DE PAPEL ══════════════ -->
-  <section class="panel" data-panel="papel">
-    <div id="papel-zona"></div>
-  </section>
 
   <section class="panel" data-panel="ajustes">
     <div class="card">
@@ -1273,7 +1414,13 @@ const Util = (() => {
   const uid = p => p + '_' + Math.random().toString(36).slice(2, 9);
   const hoy = () => new Date().toISOString().slice(0, 10);
 
-  const n = v => { const x = parseFloat(String(v ?? '').replace(',', '.')); return isFinite(x) ? x : 0; };
+  /* Acepta 4,2 · 4.2 · 1.234,56 · 1 234,5 · «12 €». Con coma, los puntos son
+     miles; sin coma, el punto es decimal (así llegan los valores del programa) */
+  const n = v => {
+    let t = String(v ?? '').trim().replace(/[\s€%]/g, '');
+    if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+    const x = parseFloat(t); return isFinite(x) ? x : 0;
+  };
   const eur = (v, dec = 2) => (isFinite(v) ? v : 0).toLocaleString('es-ES',
     { minimumFractionDigits: dec, maximumFractionDigits: dec }) + ' €';
   const num = (v, dec = 2) => (isFinite(v) ? v : 0).toLocaleString('es-ES',
@@ -1706,7 +1853,7 @@ function semilla() {
             ],
             "pasos": [
                   "Mira el beneficio por acción de los últimos cinco años: ¿crece, se estanca o es un dientes de sierra?",
-                  "Mira el PER de hoy y compáralo con el de esa misma empresa en los últimos años. La pestaña Histórico te lo da hecho.",
+                  "Mira el PER de hoy y compáralo con el de esa misma empresa en los últimos años. La bloque Indicadores de la pestaña Seguimiento te lo da hecho.",
                   "Si el PER está muy por encima de su media, pregúntate qué ha cambiado en el negocio para justificarlo. Si no ha cambiado nada, lo que ha cambiado es el humor."
             ],
             "cuidado": "El error clásico es comprar una empresa excelente a cualquier precio. Una gran empresa comprada a un múltiplo absurdo puede tardar diez años en darte dinero aunque el negocio vaya bien todo ese tiempo.",
@@ -1998,7 +2145,7 @@ function semilla() {
                   "La comparación tiene que ser honesta: tu rentabilidad ponderada por tiempo contra la del índice, en el mismo periodo y con dividendos incluidos."
             ],
             "pasos": [
-                  "Abre la pestaña Rendimiento y mira tu curva contra la del índice.",
+                  "Abre la pestaña Análisis y mira tu curva contra la del índice.",
                   "Si llevas tres o más años por detrás, pregúntate sin excusas si la selección te está pagando el trabajo.",
                   "No es todo o nada: un núcleo indexado grande y una parte pequeña para tus convicciones es una respuesta perfectamente razonable."
             ],
@@ -2044,7 +2191,7 @@ function semilla() {
                   "Qué compro: (describe el tipo de negocio, el tamaño, los mercados en los que te mueves)",
                   "Qué no compro nunca: (sectores, situaciones, países fuera de tu círculo)",
                   "Cuánto pongo en cada idea y por qué",
-                  "Cuándo vendo: (remite a tus reglas de la pestaña Filosofía)",
+                  "Cuándo vendo: (remite a tus reglas de la pestaña Método, en «Mis reglas»)",
                   "Cuánto tiempo le dedico al mes, y qué hago cuando no tengo tiempo"
             ],
             "cuidado": "Si no puedes escribir tu estrategia en una página, todavía no la tienes.",
@@ -2059,9 +2206,9 @@ function semilla() {
             "pasos": [
                   "Cada quincena: pedir el informe desde la pestaña Seguimiento, cargarlo revisando antes la previsualización, y procesar las novedades una a una.",
                   "Cada quincena: mirar el Semáforo y leer los motivos. Si algo está en rojo, abrir la ficha y registrar una revisión, aunque la decisión sea no hacer nada.",
-                  "Cada mes: actualizar precios y comprobar que ninguna posición se ha salido de los topes de la pestaña Filosofía.",
+                  "Cada mes: actualizar precios y comprobar que ninguna posición se ha salido de los topes de la pestaña Método, en «Mis reglas».",
                   "Cada trimestre, con los resultados: actualizar cifras del negocio y volver a juzgar cada hipótesis una por una.",
-                  "Cada semestre: abrir la pestaña Rendimiento y compararte con el índice sin excusas.",
+                  "Cada semestre: abrir la pestaña Análisis y compararte con el índice sin excusas.",
                   "Cada año, en noviembre: abrir la pestaña Fiscal, mirar minusvalías pendientes y decidir si conviene aflorar plusvalías o pérdidas antes del cierre.",
                   "Cada año: leer el diario de decisiones y el marcador de ventas enteros. Ahí están tus errores repetidos.",
                   "Siempre: guardar copia del archivo en tu disco. Si el aviso amarillo está arriba, hazlo ahora."
@@ -2123,6 +2270,12 @@ const Store = (() => {
     d.papel = Object.assign({ carteras: [], precios: {}, activa: '' }, d.papel || {});
     if (!Array.isArray(d.papel.carteras)) d.papel.carteras = [];
     if (!d.papel.precios || Array.isArray(d.papel.precios)) d.papel.precios = {};
+    if (!d.papel.historial || typeof d.papel.historial !== 'object' || Array.isArray(d.papel.historial)) d.papel.historial = {};
+    Object.keys(d.papel.historial).forEach(tk => {
+      const L = Array.isArray(d.papel.historial[tk]) ? d.papel.historial[tk] : [];
+      d.papel.historial[tk] = L.filter(p => p && p.f && Util.n(p.v) > 0)
+        .map(p => ({ id: p.id || (tk + '@' + p.f), f: p.f, v: Util.n(p.v) }));
+    });
     d.papel.carteras.forEach(c => {
       c.id = c.id || Util.uid('pc');
       c.nombre = c.nombre || 'Sin nombre';
@@ -3527,6 +3680,17 @@ const Motor = (() => {
 const Graf = (() => {
   const PAL = ['var(--g1)', 'var(--g2)', 'var(--g3)', 'var(--g4)', 'var(--g5)', 'var(--g6)'];
   const E = Util.esc;
+  /* En el móvil, los gráficos se dibujan al ancho que de verdad tienen en
+     pantalla en vez de a 660 y luego encogidos: así una letra de 11 se ve
+     de 11 y no de 6. En el ordenador todo sigue igual. */
+  const movil = () => window.innerWidth < 760;
+  function anchoUtil() {
+    if (!movil()) return 660;
+    const m = document.querySelector('main');
+    const w = (m ? m.clientWidth : window.innerWidth) - 30;
+    return Math.round(Math.max(300, Math.min(660, w)));
+  }
+  const F = n => movil() ? +(n + 1.5).toFixed(1) : n;
   const svg = (w, h, dentro) => `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" preserveAspectRatio="xMidYMid meet">${dentro}</svg>`;
   const vacio = t => `<div class="vacio"><b>Sin datos todavía</b>${E(t)}</div>`;
   const leyenda = items => `<div class="leyenda">${items.map(i =>
@@ -3534,49 +3698,93 @@ const Graf = (() => {
   const eje = (x1, x2, y) => `<line x1="${x1}" x2="${x2}" y1="${y}" y2="${y}" stroke="var(--g-eje)" stroke-width="1"/>`;
 
   /* Líneas con eje temporal categórico */
+  /* Líneas. Dos extras opcionales, sin cambiar los gráficos de siempre:
+     · o.fechas (ISO, una por etiqueta): reparte el eje por tiempo real.
+     · valores null: la línea se corta ahí (una serie que aún no había empezado).
+     · s.estimados (booleanos): esos tramos se dibujan más tenues. */
   function linea(etiquetas, series, o) {
     o = o || {};
     if (etiquetas.length < 2) return vacio('Hacen falta al menos dos fechas con datos.');
-    const W = 660, H = o.alto || 240, P = { t: 16, r: 16, b: 30, l: 62 };
-    const todos = series.flatMap(s => s.valores).filter(isFinite);
+    const W = anchoUtil(), H = movil() ? Math.max(o.alto || 240, 250) : (o.alto || 240), P = { t: 16, r: o.etiquetasFin ? (movil() ? 84 : 96) : 16, b: 30, l: movil() ? 50 : 62 };
+    const ok = v => v !== null && v !== undefined && isFinite(v);
+    const todos = series.flatMap(s => s.valores).filter(ok);
+    if (!todos.length) return vacio('Sin datos que dibujar.');
     let lo = o.desdeCero ? 0 : Math.min(...todos), hi = Math.max(...todos);
     if (lo === hi) { hi = lo + 1; }
     const pad = (hi - lo) * 0.08; hi += pad; if (!o.desdeCero) lo -= pad;
-    const x = i => P.l + i * (W - P.l - P.r) / (etiquetas.length - 1);
+    let x = i => P.l + i * (W - P.l - P.r) / (etiquetas.length - 1);
+    if (o.fechas && o.fechas.length === etiquetas.length) {
+      const t = o.fechas.map(f => new Date(f + 'T00:00:00').getTime());
+      const t0 = t[0], t1 = t[t.length - 1] === t0 ? t0 + 1 : t[t.length - 1];
+      x = i => P.l + (t[i] - t0) / (t1 - t0) * (W - P.l - P.r);
+    }
     const y = v => P.t + (hi - v) / (hi - lo) * (H - P.t - P.b);
     const marcas = [lo, (lo + hi) / 2, hi];
+    /* Etiquetas al final de cada línea, separadas para que no se pisen */
+    const finales = [];
+    const etiquetas2 = () => {
+      finales.sort((a, b) => a.y - b.y);
+      for (let k = 1; k < finales.length; k++) if (finales[k].y - finales[k - 1].y < F(13)) finales[k].y = finales[k - 1].y + F(13);
+      const sobra = finales.length ? finales[finales.length - 1].y - (H - P.b) : 0;
+      if (sobra > 0) finales.forEach(f => { f.y -= sobra; });
+      return finales.map(f => `<text x="${f.x.toFixed(1)}" y="${f.y.toFixed(1)}" font-size="${F(10.5)}" font-weight="650" fill="${f.col}">${E(f.t)}</text>`).join('');
+    };
     return svg(W, H, `
       ${marcas.map(v => `<line x1="${P.l}" x2="${W - P.r}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--c-border)"/>
-        <text x="${P.l - 8}" y="${(y(v) + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--c-muted)">${E(o.fmt ? o.fmt(v) : Util.num(v, 0))}</text>`).join('')}
+        <text x="${P.l - 8}" y="${(y(v) + 3.5).toFixed(1)}" text-anchor="end" font-size="${F(10)}" fill="var(--c-muted)">${E(o.fmt ? o.fmt(v) : Util.num(v, 0))}</text>`).join('')}
+      ${o.base100 && lo < 100 && hi > 100 ? `<line x1="${P.l}" x2="${W - P.r}" y1="${y(100).toFixed(1)}" y2="${y(100).toFixed(1)}" stroke="var(--c-muted)" stroke-dasharray="2 3" opacity=".6"/>` : ''}
       ${series.map((s, si) => {
         const col = s.color || PAL[si % PAL.length];
-        const pts = s.valores.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-        return `${s.area ? `<polygon points="${pts} ${x(etiquetas.length - 1).toFixed(1)},${y(lo).toFixed(1)} ${x(0).toFixed(1)},${y(lo).toFixed(1)}" fill="${col}" opacity=".10"/>` : ''}
-          <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="${s.grosor || 2}" stroke-dasharray="${s.guion || ''}" stroke-linejoin="round"/>
-          ${s.valores.map((v, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${i === s.valores.length - 1 ? 4 : 0}" fill="${col}"><title>${E(etiquetas[i])} · ${E(o.fmt ? o.fmt(v) : Util.num(v, 0))}</title></circle>`).join('')}`;
+        /* Trozos continuos de valores válidos */
+        const trozos = []; let cur = [];
+        s.valores.forEach((v, i) => { if (ok(v)) cur.push(i); else if (cur.length) { trozos.push(cur); cur = []; } });
+        if (cur.length) trozos.push(cur);
+        const pts = idx => idx.map(i => `${x(i).toFixed(1)},${y(s.valores[i]).toFixed(1)}`).join(' ');
+        const ultimo = (trozos[trozos.length - 1] || []).slice(-1)[0];
+        let dib = trozos.map(idx => {
+          const area = s.area && idx.length > 1 ? `<polygon points="${pts(idx)} ${x(idx[idx.length - 1]).toFixed(1)},${y(lo).toFixed(1)} ${x(idx[0]).toFixed(1)},${y(lo).toFixed(1)}" fill="${col}" opacity=".10"/>` : '';
+          if (!s.estimados) return area + `<polyline points="${pts(idx)}" fill="none" stroke="${col}" stroke-width="${s.grosor || 2}" stroke-dasharray="${s.guion || ''}" stroke-linejoin="round"/>`;
+          /* Con tramos estimados: cada segmento por separado, tenue si alguno de sus extremos es estimado */
+          let out = area;
+          for (let k = 1; k < idx.length; k++) {
+            const a = idx[k - 1], b = idx[k], est = s.estimados[a] || s.estimados[b];
+            out += `<line x1="${x(a).toFixed(1)}" y1="${y(s.valores[a]).toFixed(1)}" x2="${x(b).toFixed(1)}" y2="${y(s.valores[b]).toFixed(1)}"
+              stroke="${col}" stroke-width="${s.grosor || 2}" stroke-dasharray="${s.guion || ''}" stroke-linecap="round" opacity="${est ? .45 : 1}"/>`;
+          }
+          return out;
+        }).join('');
+        if (ultimo !== undefined) {
+          dib += `<circle cx="${x(ultimo).toFixed(1)}" cy="${y(s.valores[ultimo]).toFixed(1)}" r="4" fill="${col}"><title>${E(s.nombre || '')} · ${E(etiquetas[ultimo])} · ${E(o.fmt ? o.fmt(s.valores[ultimo]) : Util.num(s.valores[ultimo], 0))}</title></circle>`;
+          if (o.etiquetasFin) finales.push({ x: x(ultimo) + 7, y: y(s.valores[ultimo]) + 3.5, col,
+            t: `${(s.corto || s.nombre || '').slice(0, movil() ? 9 : 14)} ${o.fmt ? o.fmt(s.valores[ultimo]) : ''}` });
+        }
+        /* Puntos invisibles con su valor al pasar el dedo o el ratón */
+        dib += s.valores.map((v, i) => ok(v) && i !== ultimo ? `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="5" fill="transparent"><title>${E(s.nombre || '')} · ${E(etiquetas[i])} · ${E(o.fmt ? o.fmt(v) : Util.num(v, 0))}${s.estimados && s.estimados[i] ? ' (estimado)' : ''}</title></circle>` : '').join('');
+        return dib;
       }).join('')}
-      <text x="${P.l}" y="${H - 9}" font-size="10" fill="var(--c-muted)">${E(etiquetas[0])}</text>
-      <text x="${W - P.r}" y="${H - 9}" text-anchor="end" font-size="10" fill="var(--c-muted)">${E(etiquetas[etiquetas.length - 1])}</text>`);
+      ${etiquetas2()}
+      <text x="${P.l}" y="${H - 9}" font-size="${F(10)}" fill="var(--c-muted)">${E(etiquetas[0])}</text>
+      <text x="${W - P.r}" y="${H - 9}" text-anchor="end" font-size="${F(10)}" fill="var(--c-muted)">${E(etiquetas[etiquetas.length - 1])}</text>`);
   }
 
   /* Barras horizontales con línea de referencia opcional */
   function barrasH(datos, o) {
     o = o || {};
     if (!datos.length) return vacio(o.vacio || 'Nada que representar.');
-    const W = 660, fila = 26, P = { t: 10, r: 58, b: 22, l: 96 };
+    const W = anchoUtil(), fila = movil() ? 30 : 26, P = { t: 10, r: movil() ? 64 : 58, b: 22, l: movil() ? 78 : 96 };
     const H = P.t + P.b + datos.length * fila;
     const max = Math.max(o.ref || 0, ...datos.map(d => Math.abs(d.v))) * 1.12 || 1;
     const ancho = W - P.l - P.r;
     return svg(W, H, `
       ${o.ref ? `<line x1="${P.l + o.ref / max * ancho}" x2="${P.l + o.ref / max * ancho}" y1="${P.t - 4}" y2="${H - P.b + 2}"
         stroke="var(--v-vender)" stroke-width="1.5" stroke-dasharray="4 3"/>
-        <text x="${P.l + o.ref / max * ancho + 4}" y="${H - P.b + 14}" font-size="10" fill="var(--v-vender)">tope ${E(Util.num(o.ref, 0))} %</text>` : ''}
+        <text x="${P.l + o.ref / max * ancho + 4}" y="${H - P.b + 14}" font-size="${F(10)}" fill="var(--v-vender)">tope ${E(Util.num(o.ref, 0))} %</text>` : ''}
       ${datos.map((d, i) => {
         const yy = P.t + i * fila, w = Math.abs(d.v) / max * ancho;
         const col = d.color || PAL[i % PAL.length];
-        return `<text x="${P.l - 8}" y="${yy + 14}" text-anchor="end" font-size="11.5" fill="var(--c-ink)" font-weight="600">${E(d.e)}</text>
+        return `<text x="${P.l - 8}" y="${yy + 14}" text-anchor="end" font-size="${F(11.5)}" fill="var(--c-ink)" font-weight="600">${E(d.e)}</text>
           <rect x="${P.l}" y="${yy + 4}" width="${w.toFixed(1)}" height="15" rx="2.5" fill="${col}"><title>${E(d.e)} · ${E(o.fmt ? o.fmt(d.v) : Util.num(d.v, 1))}</title></rect>
-          <text x="${P.l + w + 6}" y="${yy + 16}" font-size="11" fill="var(--c-ink-soft)">${E(o.fmt ? o.fmt(d.v) : Util.num(d.v, 1))}</text>`;
+          <text x="${P.l + w + 6}" y="${yy + 16}" font-size="${F(11)}" fill="var(--c-ink-soft)">${E(o.fmt ? o.fmt(d.v) : Util.num(d.v, 1))}</text>`;
       }).join('')}
       ${eje(P.l, W - P.r, H - P.b + 2)}`);
   }
@@ -3585,7 +3793,7 @@ const Graf = (() => {
   function divergente(datos, o) {
     o = o || {};
     if (!datos.length) return vacio(o.vacio || 'Nada que representar.');
-    const W = 660, fila = 26, P = { t: 10, r: 16, b: 22, l: 96 };
+    const W = anchoUtil(), fila = movil() ? 30 : 26, P = { t: 10, r: 16, b: 22, l: movil() ? 78 : 96 };
     const H = P.t + P.b + datos.length * fila;
     const max = Math.max(...datos.map(d => Math.abs(d.v))) * 1.2 || 1;
     const medio = P.l + (W - P.l - P.r) / 2, semi = (W - P.l - P.r) / 2;
@@ -3593,11 +3801,11 @@ const Graf = (() => {
       ${datos.map((d, i) => {
         const yy = P.t + i * fila, w = Math.abs(d.v) / max * semi;
         const pos = d.v >= 0;
-        return `<text x="${P.l - 8}" y="${yy + 14}" text-anchor="end" font-size="11.5" fill="var(--c-ink)" font-weight="600">${E(d.e)}</text>
+        return `<text x="${P.l - 8}" y="${yy + 14}" text-anchor="end" font-size="${F(11.5)}" fill="var(--c-ink)" font-weight="600">${E(d.e)}</text>
           <rect x="${pos ? medio : medio - w}" y="${yy + 4}" width="${w.toFixed(1)}" height="15" rx="2.5"
             fill="${pos ? 'var(--v-mantener)' : 'var(--v-vender)'}"><title>${E(d.e)} · ${E(o.fmt ? o.fmt(d.v) : Util.signo(d.v))}</title></rect>
           <text x="${pos ? medio + w + 6 : medio - w - 6}" y="${yy + 16}" text-anchor="${pos ? 'start' : 'end'}"
-            font-size="11" fill="var(--c-ink-soft)">${E(o.fmt ? o.fmt(d.v) : Util.signo(d.v) + ' %')}</text>`;
+            font-size="${F(11)}" fill="var(--c-ink-soft)">${E(o.fmt ? o.fmt(d.v) : Util.signo(d.v) + ' %')}</text>`;
       }).join('')}
       <line x1="${medio}" x2="${medio}" y1="${P.t}" y2="${H - P.b + 2}" stroke="var(--c-border-strong)" stroke-width="1"/>`);
   }
@@ -3607,10 +3815,19 @@ const Graf = (() => {
     o = o || {};
     const total = datos.reduce((s, d) => s + d.v, 0);
     if (!total) return vacio('Nada en cartera.');
-    const W = 300, H = 200, cx = 100, cy = 100, R = 74, r = 46;
+    /* En el móvil, el lienzo justo alrededor del anillo: con el ancho de
+       ordenador el anillo quedaba a un lado y enorme */
+    const W = movil() ? 200 : 300, H = 200, cx = 100, cy = 100, R = 74, r = 46;
     let ang = -Math.PI / 2;
     const arcos = datos.map((d, i) => {
       const barre = d.v / total * Math.PI * 2;
+      /* Un solo grupo (o uno con casi todo): un arco que empieza y acaba en el
+         mismo punto no se dibuja, así que va el anillo entero */
+      if (barre >= Math.PI * 2 - 1e-6) {
+        const col1 = d.color || PAL[i % PAL.length];
+        return `<path d="M${cx - R},${cy} a${R},${R} 0 1,0 ${2 * R},0 a${R},${R} 0 1,0 ${-2 * R},0 Z M${cx - r},${cy} a${r},${r} 0 1,0 ${2 * r},0 a${r},${r} 0 1,0 ${-2 * r},0 Z"
+          fill="${col1}" fill-rule="evenodd"><title>${E(d.e)} · 100 %</title></path>`;
+      }
       const x1 = cx + R * Math.cos(ang), y1 = cy + R * Math.sin(ang);
       const x2 = cx + R * Math.cos(ang + barre), y2 = cy + R * Math.sin(ang + barre);
       const x3 = cx + r * Math.cos(ang + barre), y3 = cy + r * Math.sin(ang + barre);
@@ -3623,8 +3840,8 @@ const Graf = (() => {
         fill="${col}" stroke="var(--c-surface)" stroke-width="1.5"><title>${E(d.e)} · ${E(Util.num(d.v / total * 100, 1))} %</title></path>`;
     }).join('');
     return svg(W, H, `${arcos}
-      <text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="19" font-weight="640" fill="var(--c-ink)">${datos.length}</text>
-      <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-size="10.5" fill="var(--c-muted)">${E(o.centro || 'grupos')}</text>`)
+      <text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="${F(19)}" font-weight="640" fill="var(--c-ink)">${datos.length}</text>
+      <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-size="${F(10.5)}" fill="var(--c-muted)">${E(o.centro || 'grupos')}</text>`).replace('class="chart"', 'class="chart donut"')
       + leyenda(datos.map((d, i) => ({ nombre: `${d.e} · ${Util.num(d.v / total * 100, 0)} %`, color: d.color || PAL[i % PAL.length] })));
   }
 
@@ -3632,7 +3849,7 @@ const Graf = (() => {
   function dispersion(puntos, o) {
     o = o || {};
     if (puntos.length < 2) return vacio('Hacen falta al menos dos activos con ambos datos.');
-    const W = 660, H = 300, P = { t: 18, r: 22, b: 42, l: 56 };
+    const W = anchoUtil(), H = 300, P = { t: 18, r: 22, b: 42, l: 56 };
     const xs = puntos.map(p => p.x), ys = puntos.map(p => p.y);
     const x0 = Math.min(...xs) * 0.85, x1 = Math.max(...xs) * 1.12;
     const y0 = Math.min(0, Math.min(...ys) * 0.85), y1 = Math.max(...ys) * 1.15;
@@ -3641,16 +3858,16 @@ const Graf = (() => {
     const rmax = Math.max(...puntos.map(p => p.r || 1));
     return svg(W, H, `
       ${[y0, (y0 + y1) / 2, y1].map(v => `<line x1="${P.l}" x2="${W - P.r}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="var(--c-border)"/>
-        <text x="${P.l - 8}" y="${(Y(v) + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--c-muted)">${E(Util.num(v, 0))}</text>`).join('')}
-      ${[x0, (x0 + x1) / 2, x1].map(v => `<text x="${X(v).toFixed(1)}" y="${H - 22}" text-anchor="middle" font-size="10" fill="var(--c-muted)">${E(Util.num(v, 0))}</text>`).join('')}
+        <text x="${P.l - 8}" y="${(Y(v) + 3.5).toFixed(1)}" text-anchor="end" font-size="${F(10)}" fill="var(--c-muted)">${E(Util.num(v, 0))}</text>`).join('')}
+      ${[x0, (x0 + x1) / 2, x1].map(v => `<text x="${X(v).toFixed(1)}" y="${H - 22}" text-anchor="middle" font-size="${F(10)}" fill="var(--c-muted)">${E(Util.num(v, 0))}</text>`).join('')}
       ${puntos.map((p, i) => {
         const rr = 6 + (p.r || 1) / (rmax || 1) * 16;
         return `<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="${rr.toFixed(1)}" fill="${PAL[i % PAL.length]}" opacity=".78"/>
-          <text x="${X(p.x).toFixed(1)}" y="${(Y(p.y) - rr - 5).toFixed(1)}" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--c-ink)">${E(p.e)}</text>
+          <text x="${X(p.x).toFixed(1)}" y="${(Y(p.y) - rr - 5).toFixed(1)}" text-anchor="middle" font-size="${F(10.5)}" font-weight="600" fill="var(--c-ink)">${E(p.e)}</text>
           <title>${E(p.e)} · ${E(o.ejeX)} ${E(Util.num(p.x, 1))} · ${E(o.ejeY)} ${E(Util.num(p.y, 1))}</title>`;
       }).join('')}
-      <text x="${(W + P.l) / 2}" y="${H - 6}" text-anchor="middle" font-size="11" fill="var(--c-ink-soft)">${E(o.ejeX || '')}</text>
-      <text x="14" y="${H / 2}" transform="rotate(-90 14 ${H / 2})" text-anchor="middle" font-size="11" fill="var(--c-ink-soft)">${E(o.ejeY || '')}</text>`);
+      <text x="${(W + P.l) / 2}" y="${H - 6}" text-anchor="middle" font-size="${F(11)}" fill="var(--c-ink-soft)">${E(o.ejeX || '')}</text>
+      <text x="14" y="${H / 2}" transform="rotate(-90 14 ${H / 2})" text-anchor="middle" font-size="${F(11)}" fill="var(--c-ink-soft)">${E(o.ejeY || '')}</text>`);
   }
 
   /* Barras verticales */
@@ -3662,26 +3879,26 @@ const Graf = (() => {
     const paso = (W - P.l - P.r) / datos.length;
     return svg(W, H, `
       ${[0, max / 2, max].map(v => `<line x1="${P.l}" x2="${W - P.r}" y1="${(P.t + (max - v) / max * (H - P.t - P.b)).toFixed(1)}" y2="${(P.t + (max - v) / max * (H - P.t - P.b)).toFixed(1)}" stroke="var(--c-border)"/>
-        <text x="${P.l - 7}" y="${(P.t + (max - v) / max * (H - P.t - P.b) + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--c-muted)">${E(Util.num(v, 0))}</text>`).join('')}
+        <text x="${P.l - 7}" y="${(P.t + (max - v) / max * (H - P.t - P.b) + 3.5).toFixed(1)}" text-anchor="end" font-size="${F(10)}" fill="var(--c-muted)">${E(Util.num(v, 0))}</text>`).join('')}
       ${datos.map((d, i) => {
         const h = d.v / max * (H - P.t - P.b), xx = P.l + i * paso + paso * 0.22, w = paso * 0.56;
         return `<rect x="${xx.toFixed(1)}" y="${(H - P.b - h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2.5" fill="var(--g2)"><title>${E(d.e)} · ${E(o.fmt ? o.fmt(d.v) : Util.num(d.v, 0))}</title></rect>
-          <text x="${(xx + w / 2).toFixed(1)}" y="${H - P.b + 14}" text-anchor="middle" font-size="10.5" fill="var(--c-muted)">${E(d.e)}</text>
-          <text x="${(xx + w / 2).toFixed(1)}" y="${(H - P.b - h - 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--c-ink-soft)">${E(o.fmt ? o.fmt(d.v) : Util.num(d.v, 0))}</text>`;
+          <text x="${(xx + w / 2).toFixed(1)}" y="${H - P.b + 14}" text-anchor="middle" font-size="${F(10.5)}" fill="var(--c-muted)">${E(d.e)}</text>
+          <text x="${(xx + w / 2).toFixed(1)}" y="${(H - P.b - h - 5).toFixed(1)}" text-anchor="middle" font-size="${F(10)}" fill="var(--c-ink-soft)">${E(o.fmt ? o.fmt(d.v) : Util.num(d.v, 0))}</text>`;
       }).join('')}`);
   }
 
   /* Barras apiladas por fila */
   function apiladas(filas, cats) {
     if (!filas.length) return vacio('Nada que representar.');
-    const W = 660, fila = 26, P = { t: 10, r: 16, b: 22, l: 96 };
+    const W = anchoUtil(), fila = movil() ? 30 : 26, P = { t: 10, r: 16, b: 22, l: movil() ? 78 : 96 };
     const H = P.t + P.b + filas.length * fila;
     const ancho = W - P.l - P.r;
     return svg(W, H, filas.map((f, i) => {
       const total = f.partes.reduce((s, p) => s + p.v, 0) || 1;
       let acum = 0;
       const yy = P.t + i * fila;
-      return `<text x="${P.l - 8}" y="${yy + 14}" text-anchor="end" font-size="11.5" fill="var(--c-ink)" font-weight="600">${E(f.e)}</text>` +
+      return `<text x="${P.l - 8}" y="${yy + 14}" text-anchor="end" font-size="${F(11.5)}" fill="var(--c-ink)" font-weight="600">${E(f.e)}</text>` +
         f.partes.map(p => {
           const w = p.v / total * ancho, xx = P.l + acum; acum += w;
           return p.v ? `<rect x="${xx.toFixed(1)}" y="${yy + 4}" width="${w.toFixed(1)}" height="15" fill="${p.color}" stroke="var(--c-surface)" stroke-width="1"><title>${E(f.e)} · ${E(p.nombre)}: ${p.v}</title></rect>` : '';
@@ -3692,25 +3909,25 @@ const Graf = (() => {
   /* Rango con marca: dónde está hoy dentro de su propio recorrido */
   function rangos(datos) {
     if (!datos.length) return vacio('Hacen falta al menos tres tomas de un múltiplo para situar el dato de hoy.');
-    const W = 660, fila = 34, P = { t: 12, r: 60, b: 16, l: 96 };
+    const W = anchoUtil(), fila = 34, P = { t: 12, r: 60, b: 16, l: movil() ? 78 : 96 };
     const H = P.t + P.b + datos.length * fila;
     const ancho = W - P.l - P.r;
     return svg(W, H, datos.map((d, i) => {
       const yy = P.t + i * fila + 12;
       const esc = v => P.l + (v - d.min) / ((d.max - d.min) || 1) * ancho;
-      return `<text x="${P.l - 8}" y="${yy + 4}" text-anchor="end" font-size="11.5" font-weight="600" fill="var(--c-ink)">${E(d.e)}</text>
+      return `<text x="${P.l - 8}" y="${yy + 4}" text-anchor="end" font-size="${F(11.5)}" font-weight="600" fill="var(--c-ink)">${E(d.e)}</text>
         <line x1="${P.l}" x2="${W - P.r}" y1="${yy}" y2="${yy}" stroke="var(--c-border-strong)" stroke-width="5" stroke-linecap="round"/>
         <line x1="${esc(d.mediana).toFixed(1)}" x2="${esc(d.mediana).toFixed(1)}" y1="${yy - 9}" y2="${yy + 9}" stroke="var(--c-ink-soft)" stroke-width="1.5"/>
         <circle cx="${esc(d.actual).toFixed(1)}" cy="${yy}" r="6"
           fill="${d.actual > d.mediana ? 'var(--v-vender)' : 'var(--v-mantener)'}" stroke="var(--c-surface)" stroke-width="2">
           <title>${E(d.e)} · ${E(d.etiqueta)} hoy ${E(Util.num(d.actual, 1))}, mediana ${E(Util.num(d.mediana, 1))}</title></circle>
-        <text x="${W - P.r + 6}" y="${yy + 4}" font-size="10.5" fill="var(--c-ink-soft)">${E(Util.num(d.actual, 1))}</text>
-        <text x="${P.l}" y="${yy + 20}" font-size="9.5" fill="var(--c-muted)">${E(d.etiqueta)} ${E(Util.num(d.min, 1))}</text>
-        <text x="${W - P.r}" y="${yy + 20}" text-anchor="end" font-size="9.5" fill="var(--c-muted)">${E(Util.num(d.max, 1))}</text>`;
+        <text x="${W - P.r + 6}" y="${yy + 4}" font-size="${F(10.5)}" fill="var(--c-ink-soft)">${E(Util.num(d.actual, 1))}</text>
+        <text x="${P.l}" y="${yy + 20}" font-size="${F(9.5)}" fill="var(--c-muted)">${E(d.etiqueta)} ${E(Util.num(d.min, 1))}</text>
+        <text x="${W - P.r}" y="${yy + 20}" text-anchor="end" font-size="${F(9.5)}" fill="var(--c-muted)">${E(Util.num(d.max, 1))}</text>`;
     }).join('')) + `<p class="nota-graf">La raya vertical es la mediana de su histórico; el punto, dónde cotiza hoy.</p>`;
   }
 
-  return { PAL, linea, barrasH, divergente, donut, dispersion, barrasV, apiladas, rangos, leyenda, vacio };
+  return { PAL, linea, barrasH, divergente, donut, dispersion, barrasV, apiladas, rangos, leyenda, vacio, anchoUtil, F, movil };
 })();
 
 /* ═══════════════ CRIBA ═══════════════
@@ -3898,16 +4115,25 @@ const Criba = (() => {
 /* ═══════════════ MODAL ═══════════════ */
 const Modal = (() => {
   const ov = () => $('#ov');
-  function abrir({ titulo, cuerpo, pie, ancho, alAbrir }) {
+  function abrir({ titulo, cuerpo, pie, ancho, alAbrir, clase }) {
     $('#modal-t').textContent = titulo;
+    $('#modal').classList.toggle('papel', clase === 'papel');
     $('#modal-b').innerHTML = cuerpo;
     $('#modal-f').innerHTML = pie || '<button class="btn" data-cerrar>Cerrar</button>';
     $('#modal').classList.toggle('wide', !!ancho);
+    /* Los campos numéricos como texto con teclado decimal: el type=number
+       del móvil se traga la coma («4,2» se queda en blanco) según el idioma */
+    $$('#modal-b input[type=number]').forEach(i => {
+      const v = i.value;
+      i.type = 'text'; i.inputMode = 'decimal'; i.value = v;
+    });
+    $('#modal-b').scrollTop = 0;
+    document.body.classList.add('modal-abierto');
     ov().classList.add('open');
     $$('#modal [data-cerrar]').forEach(b => b.onclick = cerrar);
     if (alAbrir) alAbrir();
   }
-  function cerrar() { ov().classList.remove('open'); }
+  function cerrar() { ov().classList.remove('open'); document.body.classList.remove('modal-abierto'); }
   function confirmar(titulo, texto, alAceptar, etiqueta) {
     abrir({
       titulo, cuerpo: `<p class="soft">${Util.esc(texto)}</p>`,
@@ -4241,6 +4467,7 @@ const Vistas = (() => {
             <td class="small soft">${Util.esc((a.tesis.hipotesis[0] || {}).texto || a.valoracion.notas || '—')}</td>
             <td class="no-print nowrap"><button class="btn mini" data-ficha2="${a.id}">Ficha</button>
               <button class="btn mini" data-comprar="${a.id}">Comprar</button>
+              <button class="btn mini btn-papel" data-probar="${a.id}" title="Comprarla con dinero imaginario en una cartera de papel">Probar en papel</button>
               <button class="btn mini" data-quitarvig="${a.id}">Quitar</button></td>
           </tr>`;
         }).join('') : `<tr><td colspan="${col + 1}" class="vacio"><b>Nada en vigilancia todavía</b>Añade un activo y déjalo «en vigilancia», o pásalo desde el cribado.</td></tr>`}</tbody>`;
@@ -4287,6 +4514,10 @@ const Vistas = (() => {
       $$('#tbl-vigilancia [data-ficha2]').forEach(b => b.onclick = () => Ficha.abrir(b.dataset.ficha2));
       $$('#tbl-vigilancia [data-comprar]').forEach(b => b.onclick = () => Ops.nueva(b.dataset.comprar, 'compra'));
       $$('#tbl-vigilancia [data-quitarvig]').forEach(b => b.onclick = () => quitarDeVigilancia(b.dataset.quitarvig));
+      $$('#tbl-vigilancia [data-probar]').forEach(b => b.onclick = () => {
+        const a = Store.activo(b.dataset.probar);
+        if (typeof Papel !== 'undefined') Papel.probar(a.ticker, a.nombre);
+      });
 
       $$('[data-precio]').forEach(i => i.onchange = () => {
         const a = Store.activo(i.dataset.precio);
@@ -5645,7 +5876,7 @@ const Vistas = (() => {
         { ref: Util.n(Store.ajustes().topePosicion), fmt: v => Util.num(v, 1) + ' %', vacio: 'Sin posiciones abiertas.' });
 
       /* 3 · Latente por posición */
-      $('#g-latente').innerHTML = Graf.divergente(
+      if ($('#g-latente')) $('#g-latente').innerHTML = Graf.divergente(
         abiertas.map(f => ({ e: f.a.ticker, v: f.p.latentePct })),
         { fmt: v => Util.signo(v) + ' %', vacio: 'Sin posiciones abiertas.' });
 
@@ -5719,6 +5950,269 @@ const Vistas = (() => {
       </div></div>`;
     }
 
+
+    /* ── Estrategias de papel superpuestas ─────────────────────────── */
+    const COL_PAPEL = ['#c98a16', '#8b5cf6', '#0e9aa7', '#db2777', '#65a30d', '#ea580c'];
+    const colorPapel = i => COL_PAPEL[i % COL_PAPEL.length];
+    function papelesPuestos() {
+      if (typeof Papel === 'undefined') return [];
+      const aj = Store.ajustes();
+      const ids = new Set(aj.analisisPapel || []);
+      return Papel.carteras().map((c, i) => ({ c, i, color: colorPapel(i) })).filter(x => ids.has(x.c.id));
+    }
+    function selectorPapel() {
+      const z = $('#an-papel'); if (!z) return;
+      if (typeof Papel === 'undefined' || !Papel.carteras().length) {
+        z.innerHTML = `<div class="papel-cmp vacio-cmp"><span class="papel-sello">Papel</span>
+          <span class="small mut">Cuando tengas carteras de papel (Cartera → Papel), podrás superponer aquí cada estrategia.</span></div>`;
+        return;
+      }
+      const aj = Store.ajustes();
+      const puestas = new Set(aj.analisisPapel || []);
+      z.innerHTML = `<div class="papel-cmp">
+          <div class="papel-cmp-t"><span class="papel-sello">Papel</span> Superponer estrategias imaginarias</div>
+          <div class="chips">${Papel.carteras().map((c, i) => `
+            <button class="chip chip-papel ${puestas.has(c.id) ? 'on' : ''}" data-anp="${c.id}" style="--col:${colorPapel(i)}">
+              <i style="background:${colorPapel(i)}"></i><span>${Util.esc(c.nombre)}</span></button>`).join('')}</div>
+          ${puestas.size ? `<div class="papel-cmp-desde"><label class="small mut">Comparar</label>
+            <select id="an-desde">
+              <option value="comun" ${aj.analisisDesde !== 'propio' ? 'selected' : ''}>todas desde la misma fecha (lo justo)</option>
+              <option value="propio" ${aj.analisisDesde === 'propio' ? 'selected' : ''}>cada una desde su principio</option>
+            </select></div>` : ''}
+        </div>`;
+      $$('[data-anp]').forEach(b => b.onclick = () => {
+        const s2 = new Set(aj.analisisPapel || []);
+        s2.has(b.dataset.anp) ? s2.delete(b.dataset.anp) : s2.add(b.dataset.anp);
+        aj.analisisPapel = [...s2]; Store.guardar(); render();
+      });
+      const d = $('#an-desde'); if (d) d.onchange = () => { aj.analisisDesde = d.value; Store.guardar(); render(); };
+    }
+
+    /* Valor de una serie en una fecha: el último conocido para la real (va a
+       saltos), la recta entre puntos para el papel */
+    function valorEn(pts, f, interpolar) {
+      if (!pts.length || f < pts[0].fecha) return null;
+      let a = null, b = null;
+      for (const p of pts) { if (p.fecha <= f) a = p; else { b = p; break; } }
+      if (!a) return null;
+      if (a.fecha === f || !interpolar || !b) return { v: a.v, est: !!a.est || (interpolar && a.fecha !== f) };
+      const t = x => new Date(x + 'T00:00:00').getTime();
+      return { v: a.v + (b.v - a.v) * (t(f) - t(a.fecha)) / (t(b.fecha) - t(a.fecha)), est: true };
+    }
+    function peorCaida(vals) {
+      let pico = -Infinity, peor = 0;
+      vals.forEach(v => { if (v === null) return; pico = Math.max(pico, v); peor = Math.min(peor, (v / pico - 1) * 100); });
+      return peor;
+    }
+
+    /* Curva de la real, el índice y las estrategias puestas, en base 100 */
+    function curvaComparada(r, puestas) {
+      const aj = Store.ajustes();
+      const series = [];
+      if (r) {
+        series.push({ nombre: 'Tu cartera real', corto: 'Real', color: 'var(--g1)', grosor: 2.6, interp: false,
+          pts: r.puntos.map(p => ({ fecha: p.fecha, v: p.cartera })) });
+        if (r.ref) series.push({ nombre: r.ref.nombre, corto: 'Índice', color: 'var(--c-muted)', grosor: 1.8, guion: '2 3', interp: false,
+          pts: r.puntos.map(p => ({ fecha: p.fecha, v: p.indice })) });
+      }
+      puestas.forEach(x => {
+        const se = Papel.serie(x.c);
+        if (se.length < 2) return;
+        series.push({ nombre: x.c.nombre + ' (papel)', corto: x.c.nombre, color: x.color, grosor: 2, guion: '7 4', interp: true, papel: x.c,
+          pts: se.map(p => ({ fecha: p.fecha, v: p.base, est: p.est })) });
+      });
+      if (!series.length) return null;
+      const comun = aj.analisisDesde !== 'propio';
+      const inicio = comun ? series.map(s => s.pts[0].fecha).sort().pop() : series.map(s => s.pts[0].fecha).sort()[0];
+      const fechas = [...new Set(series.flatMap(s => s.pts.map(p => p.fecha)))].filter(f => f >= inicio).sort();
+      if (fechas.length < 2) return { vacia: true, inicio };
+      const salida = series.map(s => {
+        const base = comun ? (valorEn(s.pts, inicio, s.interp) || {}).v : 100;
+        const vals = [], est = [];
+        fechas.forEach(f => {
+          const q = valorEn(s.pts, f, s.interp);
+          vals.push(q && base ? q.v / base * 100 : null);
+          est.push(!!(q && q.est));
+        });
+        return Object.assign({}, s, { valores: vals, estimados: s.interp ? est : null });
+      });
+      return { fechas, series: salida, inicio, comun };
+    }
+
+    function filasComparadas(cv) {
+      return cv.series.map(s => {
+        const v = s.valores.filter(x => x !== null);
+        const ini = v[0], fin = v[v.length - 1];
+        const total = ini ? (fin / ini - 1) * 100 : 0;
+        const desdeS = cv.fechas[s.valores.findIndex(x => x !== null)];
+        const anosS = Math.max(Util.dias(desdeS, cv.fechas[cv.fechas.length - 1]) / 365.25, 0.01);
+        const anual = anosS >= 0.25 && ini ? (Math.pow(fin / ini, 1 / anosS) - 1) * 100 : null;
+        return { s, total, anual, caida: peorCaida(s.valores), desde: desdeS, est: s.estimados && s.estimados.some(Boolean) };
+      });
+    }
+    function tablaComparada(cv) {
+      const filas = filasComparadas(cv);
+      const orden = filas.slice().sort((a, b) => (b.anual ?? b.total) - (a.anual ?? a.total));
+      return `<div class="tbl-wrap" style="margin-top:12px"><table class="tbl-cmp ${cv.comun ? 'comun' : ''}">
+        <thead><tr><th>Serie</th><th class="c-desde">Desde</th><th class="r">Gana</th><th class="r">Al año</th><th class="r">Peor caída</th></tr></thead>
+        <tbody>${orden.map(f => `<tr class="${f.s.papel ? 'fila-papel' : ''}">
+          <td class="tick"><i class="punto-serie" style="background:${f.s.color}"></i>${f.s.papel ? '<span class="papel-sello">Papel</span>' : ''}${Util.esc(f.s.papel ? f.s.papel.nombre : f.s.nombre)}
+            ${f.est ? '<small>en parte estimada</small>' : ''}</td>
+          <td class="small soft c-desde">${Util.fecha(f.desde)}</td>
+          <td class="r num ${f.total >= 0 ? 'pos' : 'neg'}">${Util.signo(f.total)} %</td>
+          <td class="r num ${(f.anual || 0) >= 0 ? 'pos' : 'neg'}">${f.anual === null ? '—' : Util.signo(f.anual) + ' %'}</td>
+          <td class="r num ${f.caida < -0.05 ? 'neg' : ''}">${f.caida < -0.05 ? Util.num(f.caida, 1) + ' %' : 'sin caídas'}</td>
+        </tr>`).join('')}</tbody></table></div>
+        <p class="nota-graf">${cv.comun ? `Todas parten de 100 el ${Util.fecha(cv.inicio)}, el primer día en que existen todas: es la comparación justa.` : 'Cada una parte de 100 en su propio principio: sirve para ver su historia, no para compararlas entre sí.'}
+        Menos de un trimestre no da para un «al año». La peor caída es cuánto llegó a perder desde su máximo: dice cuánto te habría costado aguantar el método.</p>`;
+    }
+
+
+    let ultimaCv = null;
+    function dibujarCurva(r, puestas) {
+      const cv = curvaComparada(r, puestas);
+      ultimaCv = cv && !cv.vacia ? cv : null;
+      if (!cv) return Graf.vacio('Nada que dibujar todavía.');
+      if (cv.vacia) return Graf.vacio(`Las series elegidas no coinciden en el tiempo: la última empieza el ${Util.fecha(cv.inicio)} y desde entonces aún no hay precios. Prueba «cada una desde su principio».`);
+      $('#rd-sub').textContent = cv.comun ? `Todas en base 100 el ${Util.fecha(cv.inicio)}` : 'Cada una en base 100 en su principio';
+      return Graf.linea(cv.fechas.map(f => Util.fecha(f)),
+          cv.series.map(s => ({ nombre: s.nombre, corto: s.corto, valores: s.valores, color: s.color, grosor: s.grosor, guion: s.guion, estimados: s.estimados })),
+          { fmt: v => Util.num(v, 0), alto: 290, fechas: cv.fechas, etiquetasFin: true, base100: true })
+        + Graf.leyenda(cv.series.map(s => ({ nombre: s.nombre, color: s.color })))
+        + `<p class="nota-graf">Línea continua: lo real. Discontinua: estrategias de papel. Los tramos más tenues son estimados entre dos precios conocidos; se afinan solos según vas apuntando precios.</p>`
+        + tablaComparada(cv);
+    }
+
+
+    /* ── Estrategias frente a frente ────────────────────────────────
+       Cada indicador solo para quien lo tiene con sentido: el índice no
+       «opera» ni tiene PER propio aquí, y lo real no tiene liquidez apuntada. */
+    function indicadorDe(tk, k) {
+      const a = Store.activos().find(x => (x.ticker || '').toUpperCase() === String(tk).toUpperCase());
+      if (a) {
+        if (Util.n(a.cotizacion[k])) return Util.n(a.cotizacion[k]);
+        const t = (a.serie || []).slice().reverse().find(x => Util.n(x[k]));
+        if (t) return Util.n(t[k]);
+      }
+      try {
+        const e = Store.universo().find(x => (x.ticker || '').toUpperCase() === String(tk).toUpperCase());
+        if (e && Util.n(e[k])) return Util.n(e[k]);
+      } catch (err) {}
+      return null;
+    }
+    /* Media ponderada por valor, y de cuántas posiciones había dato */
+    function ponderado(pos, k) {
+      let s = 0, w = 0, con = 0;
+      pos.forEach(p => { const v = indicadorDe(p.tk, k); if (v !== null && p.valor > 0) { s += v * p.valor; w += p.valor; con++; } });
+      return w ? { v: s / w, con, de: pos.length } : { v: null, con: 0, de: pos.length };
+    }
+    function operativaReal() {
+      const ops = Store.ops().filter(o => o.tipo === 'compra' || o.tipo === 'venta');
+      if (!ops.length) return null;
+      const ventas = Calc.ventasFiscales();
+      const primera = ops.map(o => o.fecha).sort()[0];
+      const anos = Math.max(Util.dias(primera, Util.hoy()) / 365.25, 0.25);
+      const invertido = Store.ops().filter(o => o.tipo === 'compra').reduce((s2, o) => s2 + o.titulos * o.precio, 0);
+      const comis = Store.ops().reduce((s2, o) => s2 + Util.n(o.comision), 0);
+      const dias = ventas.map(v => v.consumidos && v.consumidos[0] ? Util.dias(v.consumidos[0].fecha, v.fecha) : null).filter(x => x !== null);
+      const c = Calc.cartera();
+      return {
+        aciertos: ventas.length ? ventas.filter(v => v.resultado > 0).length / ventas.length * 100 : null, cerradas: ventas.length,
+        opsAno: ops.length / anos, comisiones: invertido ? comis / invertido * 100 : null,
+        dias: dias.length ? dias.reduce((a, b) => a + b, 0) / dias.length : null,
+        pos: c.abiertas.map(f => ({ tk: f.a.ticker, valor: f.p.valor })), liquidez: null
+      };
+    }
+    function operativaPapel(c) {
+      const r = Papel.calcular(c);
+      const anos = Math.max(Util.dias(c.creada, Util.hoy()) / 365.25, 0.25);
+      const dias = r.cerradas.filter(x => x.dias !== null).map(x => x.dias);
+      return {
+        aciertos: r.aciertos, cerradas: r.cerradas.length,
+        opsAno: c.operaciones.length / anos, comisiones: r.invertido ? r.comisiones / r.invertido * 100 : null,
+        dias: dias.length ? dias.reduce((a, b) => a + b, 0) / dias.length : null,
+        pos: r.posiciones.filter(p => !p.sinPrecio).map(p => ({ tk: p.ticker, valor: p.valor })),
+        liquidez: r.valor > 0 ? Math.max(0, r.caja) / r.valor * 100 : null
+      };
+    }
+
+    function tarjetaIndicadores(r, puestas) {
+      const cv = ultimaCv;
+      const res = cv ? filasComparadas(cv) : [];
+      const deRes = s => res.find(f => f.s === s) || null;
+      /* Las series de la tarjeta, en el mismo orden y color que la curva */
+      const series = [];
+      if (r) series.push({ nombre: 'Tu cartera real', color: 'var(--g1)', papel: false, res: cv ? deRes(cv.series.find(x => x.corto === 'Real')) : null, op: operativaReal() });
+      if (r && r.ref) series.push({ nombre: r.ref.nombre, color: 'var(--c-muted)', indice: true, res: cv ? deRes(cv.series.find(x => x.corto === 'Índice')) : null, op: null });
+      puestas.forEach(x => series.push({ nombre: x.c.nombre, color: x.color, papel: true,
+        res: cv ? deRes(cv.series.find(s2 => s2.papel === x.c)) : null, op: operativaPapel(x.c) }));
+
+      const grupos = [
+        { t: 'Resultado', sub: cv ? (cv.comun ? `en el mismo periodo, desde el ${Util.fecha(cv.inicio)}` : 'cada una desde su principio') : '', ind: [
+          { n: 'Rentabilidad al año', mejor: 'alto', f: v => Util.signo(v) + ' %', v: s => s.res ? s.res.anual : null,
+            nota: 'Con menos de un trimestre no se calcula.' },
+          { n: 'Peor caída desde un máximo', mejor: 'bajo', f: v => v < -0.05 ? Util.num(v, 1) + ' %' : 'sin caídas', v: s => s.res ? s.res.caida : null, abs: true },
+          { n: 'Rentabilidad al año por cada punto de caída', mejor: 'alto', f: v => Util.num(v, 2), v: s => s.res && s.res.anual !== null && s.res.caida < -0.5 ? s.res.anual / Math.abs(s.res.caida) : null,
+            nota: 'Cuánto gana por cada punto que te hizo sufrir. Más es mejor: el mismo resultado con menos sustos.' }
+        ]},
+        { t: 'Cómo opera', sub: 'el índice no opera, por eso no sale aquí', ind: [
+          { n: 'Ventas con ganancia', mejor: 'alto', f: v => Util.num(v, 0) + ' %', v: s => s.op ? s.op.aciertos : null, extra: s => s.op && s.op.cerradas ? `de ${s.op.cerradas}` : '',
+            nota: 'Con menos de veinte ventas dice más de la suerte que del método.' },
+          { n: 'Operaciones al año', mejor: null, f: v => Util.num(v, 1), v: s => s.op ? s.op.opsAno : null,
+            nota: 'Ni bueno ni malo por sí solo: más operaciones son más comisiones y más impuestos antes de tiempo.' },
+          { n: 'Comisiones sobre lo invertido', mejor: 'bajo', f: v => Util.num(v, 2) + ' %', v: s => s.op ? s.op.comisiones : null },
+          { n: 'Días en cartera hasta vender', mejor: null, f: v => Util.num(v, 0), v: s => s.op ? s.op.dias : null }
+        ]},
+        { t: 'Qué tiene hoy', sub: 'media ponderada por lo que pesa cada posición', ind: [
+          { n: 'PER medio', mejor: 'bajo', f: v => Util.num(v, 1), v: s => s.op ? ponderado(s.op.pos, 'per').v : null, extra: s => { const p = s.op && ponderado(s.op.pos, 'per'); return p && p.con < p.de ? `con dato de ${p.con} de ${p.de}` : ''; } },
+          { n: 'Rentabilidad por dividendo', mejor: 'alto', f: v => Util.num(v, 1) + ' %', v: s => s.op ? ponderado(s.op.pos, 'divYield').v : null, extra: s => { const p = s.op && ponderado(s.op.pos, 'divYield'); return p && p.con < p.de ? `con dato de ${p.con} de ${p.de}` : ''; } },
+          { n: 'Posiciones abiertas', mejor: null, f: v => Util.num(v, 0), v: s => s.op ? s.op.pos.length : null },
+          { n: 'Peso de la mayor posición', mejor: 'bajo', f: v => Util.num(v, 0) + ' %', v: s => { if (!s.op || !s.op.pos.length) return null; const t = s.op.pos.reduce((a, p) => a + p.valor, 0); return t ? Math.max(...s.op.pos.map(p => p.valor)) / t * 100 : null; },
+            nota: 'Cuánto te juegas a una sola carta.' },
+          { n: 'Sin invertir', mejor: null, f: v => Util.num(v, 0) + ' %', v: s => s.op ? s.op.liquidez : null }
+        ]}
+      ];
+
+      const bloqueInd = ind => {
+        const filas = series.map(s => ({ s, v: ind.v(s) })).filter(x => x.v !== null && x.v !== undefined && isFinite(x.v));
+        if (filas.length < 2) return '';
+        const mag = x => ind.abs ? Math.abs(x) : x;
+        const max = Math.max(...filas.map(x => Math.abs(mag(x.v))), 0.0001);
+        let mejor = null;
+        if (ind.mejor) mejor = filas.slice().sort((a, b) => ind.mejor === 'alto' ? b.v - a.v : (ind.abs ? Math.abs(a.v) - Math.abs(b.v) : a.v - b.v))[0];
+        return `<div class="fi-ind">
+          <div class="fi-n">${Util.esc(ind.n)}${ind.mejor ? `<small>${ind.mejor === 'alto' ? 'más es mejor' : 'menos es mejor'}</small>` : ''}</div>
+          ${filas.map(x => `<div class="fi-fila ${x.s.papel ? 'es-papel' : ''}">
+              <span class="fi-q"><i style="background:${x.s.color}"></i>${x.s.papel ? '<b class="papel-sello">P</b>' : ''}${Util.esc(x.s.nombre)}</span>
+              <span class="fi-barra"><b style="width:${Math.max(2, Math.abs(mag(x.v)) / max * 100).toFixed(1)}%;background:${x.s.color}${x.v < 0 && !ind.abs ? ';opacity:.55' : ''}"></b></span>
+              <span class="fi-v ${mejor && x === mejor ? 'mejor' : ''}">${mejor && x === mejor ? '★ ' : ''}${ind.f(x.v)}${ind.extra && ind.extra(x.s) ? `<small>${ind.extra(x.s)}</small>` : ''}</span>
+            </div>`).join('')}
+          ${ind.nota ? `<p class="fi-nota">${ind.nota}</p>` : ''}
+        </div>`;
+      };
+      const html = grupos.map(g => {
+        const dentro = g.ind.map(bloqueInd).join('');
+        return dentro ? `<div class="fi-grupo"><div class="fi-gt">${g.t}<small>${g.sub}</small></div>${dentro}</div>` : '';
+      }).join('');
+      return html || `<p class="small mut">Aún no hay datos suficientes para comparar indicador a indicador.</p>`;
+    }
+
+    /* «De dónde sale» de cada estrategia: lo ganado o perdido por valor */
+    function contribPapel(puestas) {
+      return puestas.map(x => {
+        const r = Papel.calcular(x.c);
+        const por = {};
+        r.posiciones.forEach(p => { por[p.ticker] = (por[p.ticker] || 0) + p.latente; });
+        r.cerradas.forEach(c => { por[c.ticker] = (por[c.ticker] || 0) + c.resultado; });
+        const datos = Object.entries(por).map(([e, v]) => ({ e, v })).sort((a, b) => b.v - a.v);
+        return `<div class="contrib-papel" style="--col:${x.color}">
+          <div class="contrib-papel-t"><span class="papel-sello">Papel</span>${Util.esc(x.c.nombre)}
+            <span class="small mut">· ${Util.eur(datos.reduce((s, d) => s + d.v, 0), 0)} en total</span></div>
+          ${Graf.divergente(datos, { fmt: v => Util.eur(v, 0), vacio: 'Sin operaciones en esta cartera.' })}
+        </div>`;
+      }).join('');
+    }
+
     function render() {
       const acts = Store.activos();
       const bm = Store.get().benchmark;
@@ -5728,12 +6222,18 @@ const Vistas = (() => {
         + (bm.serie.length ? `<option value="serie" ${aj.benchmarkId === 'serie' ? 'selected' : ''}>${Util.esc(bm.nombre || 'Índice cargado')} (${bm.serie.length} niveles)</option>` : '');
       $('#rd-ref').onchange = () => { aj.benchmarkId = $('#rd-ref').value; Store.save(); };
 
+      selectorPapel();
+      const puestas = papelesPuestos();
       const r = Calc.rendimiento();
       if (!r) {
         $('#rd-avisos').innerHTML = '';
         $('#rd-kpis').innerHTML = '';
-        $('#rd-curva').innerHTML = Graf.vacio('Hacen falta operaciones y precios históricos de la referencia. Carga un informe o importa un CSV con el histórico.');
-        $('#rd-replica').innerHTML = ''; $('#rd-contrib').innerHTML = ''; $('#tbl-contrib').innerHTML = '';
+        $('#rd-curva').innerHTML = puestas.length ? dibujarCurva(null, puestas)
+          : Graf.vacio('Hacen falta operaciones y precios históricos de la referencia. Carga un informe o importa un CSV con el histórico.');
+        $('#rd-replica').innerHTML = ''; $('#tbl-contrib').innerHTML = '';
+        $('#rd-contrib').innerHTML = puestas.length ? contribPapel(puestas) : '';
+        $('#an-cmp-card').hidden = !puestas.length;
+        $('#an-cmp').innerHTML = puestas.length ? tarjetaIndicadores(null, puestas) : '';
         return;
       }
 
@@ -5760,7 +6260,9 @@ const Vistas = (() => {
       </div>`;
 
       $('#rd-sub').textContent = `Base 100 el ${Util.fecha(r.desde)} · ${Util.num(r.anos, 1)} años`;
-      $('#rd-curva').innerHTML = Graf.linea(
+      $('#an-cmp-card').hidden = !puestas.length;
+      if (puestas.length) { $('#rd-curva').innerHTML = dibujarCurva(r, puestas); $('#an-cmp').innerHTML = tarjetaIndicadores(r, puestas); }
+      else $('#rd-curva').innerHTML = Graf.linea(
         r.puntos.map(p => Util.fecha(p.fecha)),
         [{ nombre: 'Cartera', valores: r.puntos.map(p => p.cartera), color: 'var(--g1)', grosor: 2.4 },
          { nombre: 'Índice', valores: r.puntos.map(p => p.indice), color: 'var(--c-muted)', grosor: 1.8, guion: '5 4' }],
@@ -5789,7 +6291,8 @@ const Vistas = (() => {
       $('#rd-contrib').innerHTML = Graf.divergente(
         con.map(c => ({ e: c.a.ticker, v: c.total })),
         { fmt: v => Util.eur(v, 0), vacio: 'Sin operaciones registradas.' })
-        + `<p class="nota-graf">Suma de plusvalía latente, resultado ya realizado y dividendos netos de cada posición.</p>`;
+        + `<p class="nota-graf">Suma de plusvalía latente, resultado ya realizado y dividendos netos de cada posición.</p>`
+        + (puestas.length ? contribPapel(puestas) : '');
 
       const total = con.reduce((s, c) => s + c.total, 0);
       $('#tbl-contrib').innerHTML = `
@@ -5817,7 +6320,8 @@ const Vistas = (() => {
     function grafico(tomas, m) {
       const vals = tomas.filter(t => isFinite(t[m.k]) && t[m.k] !== undefined);
       if (vals.length < 2) return `<div class="vacio"><b>Faltan tomas</b>Con menos de dos observaciones no hay evolución que dibujar.</div>`;
-      const W = 640, H = 190, P = { t: 14, r: 14, b: 26, l: 48 };
+      /* Al ancho real en el móvil, como los demás gráficos */
+      const W = Graf.movil() ? Graf.anchoUtil() : 640, H = Graf.movil() ? 210 : 190, P = { t: 14, r: 14, b: 26, l: Graf.movil() ? 44 : 48 };
       const ys = vals.map(t => t[m.k]);
       let lo = Math.min(...ys), hi = Math.max(...ys);
       if (lo === hi) { lo = lo * 0.95; hi = hi * 1.05; }
@@ -5829,14 +6333,14 @@ const Vistas = (() => {
       const marcas = [hi - pad * 0.5, (hi + lo) / 2, lo + pad * 0.5];
       return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;overflow:visible" role="img">
         ${marcas.map(v => `<line x1="${P.l}" x2="${W - P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--c-border)" stroke-width="1"/>
-          <text x="${P.l - 7}" y="${y(v) + 3.5}" text-anchor="end" font-size="10" fill="var(--c-muted)">${Util.num(v, m.dec)}</text>`).join('')}
+          <text x="${P.l - 7}" y="${y(v) + 3.5}" text-anchor="end" font-size="${Graf.F(10)}" fill="var(--c-muted)">${Util.num(v, m.dec)}</text>`).join('')}
         ${med ? `<line x1="${P.l}" x2="${W - P.r}" y1="${y(med.mediana)}" y2="${y(med.mediana)}" stroke="var(--c-accent)" stroke-width="1" stroke-dasharray="4 3" opacity=".7"/>
-          <text x="${W - P.r}" y="${y(med.mediana) - 5}" text-anchor="end" font-size="10" fill="var(--c-accent)">mediana ${Util.num(med.mediana, m.dec)}</text>` : ''}
+          <text x="${W - P.r}" y="${y(med.mediana) - 5}" text-anchor="end" font-size="${Graf.F(10)}" fill="var(--c-accent)">mediana ${Util.num(med.mediana, m.dec)}</text>` : ''}
         <polyline points="${pts}" fill="none" stroke="var(--c-ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
         ${vals.map((t, i) => `<circle cx="${x(i)}" cy="${y(t[m.k])}" r="${i === vals.length - 1 ? 4.5 : 2.5}"
           fill="${i === vals.length - 1 ? 'var(--c-accent)' : 'var(--c-ink)'}"><title>${Util.fecha(t.fecha)} · ${Util.num(t[m.k], m.dec)}${m.u}${t.fuente ? ' · ' + Util.esc(t.fuente) : ''}</title></circle>`).join('')}
-        <text x="${P.l}" y="${H - 8}" font-size="10" fill="var(--c-muted)">${Util.fecha(vals[0].fecha)}</text>
-        <text x="${W - P.r}" y="${H - 8}" text-anchor="end" font-size="10" fill="var(--c-muted)">${Util.fecha(vals[vals.length - 1].fecha)}</text>
+        <text x="${P.l}" y="${H - 8}" font-size="${Graf.F(10)}" fill="var(--c-muted)">${Util.fecha(vals[0].fecha)}</text>
+        <text x="${W - P.r}" y="${H - 8}" text-anchor="end" font-size="${Graf.F(10)}" fill="var(--c-muted)">${Util.fecha(vals[vals.length - 1].fecha)}</text>
       </svg>`;
     }
 
@@ -6305,124 +6809,149 @@ const Ficha = (() => {
   function nuevoActivo() {
     Modal.abrir({
       titulo: 'Añadir activo',
-      cuerpo: `<div class="field buscador">
-          <label>Buscar la empresa, el ETF o el fondo</label>
-          <input id="na-buscar" placeholder="Escribe el nombre o el ticker: telefonica, IWDA, Cobas…" autocomplete="off">
-          <div id="na-sug" class="sugerencias"></div>
-          <p class="small mut" style="margin:6px 0 0">Rellena el ticker, el nombre y el tipo.
-          Los datos (precio, PER…) no vienen de aquí: salen de lo que importes en Cribado o de un paquete.</p>
-        </div>
-        <div class="form-grid" style="margin-top:14px">
-          <div class="field"><label>Ticker</label><input id="na-tk" placeholder="TAR"></div>
-          <div class="field"><label>Nombre</label><input id="na-nb" placeholder="Talleres Aranda"></div>
+      cuerpo: `
+        <p class="small mut" style="margin:0 0 12px">Empieza a escribir el ticker o el nombre y elige de la lista:
+        se rellena lo demás. Si no está, escríbelo a mano igual.</p>
+        <div class="form-grid">
+          <div class="field"><label>Ticker</label>
+            <input id="na-tk" placeholder="p. ej. ITX, IWDA…" autocapitalize="characters">
+            <div class="campo-aviso" id="na-tk-aviso"></div></div>
+          <div class="field"><label>Nombre</label>
+            <input id="na-nb" placeholder="p. ej. telefónica, vanguard…"></div>
           <div class="field"><label>Tipo</label><select id="na-tp">${Object.entries(TIPOS).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></div>
-          <div class="field"><label>Sector</label><input id="na-sc" placeholder="Industrial"></div>
-          <div class="field"><label>País</label><input id="na-pa" placeholder="España"></div>
-          <div class="field"><label>ISIN</label><input id="na-is"></div>
-          <div class="field"><label>Precio actual</label><input type="number" step="any" id="na-pr"></div>
-          <div class="field"><label>Escenario base (€)</label><input type="number" step="any" id="na-bs"></div>
-          <div class="field"><label>Estado</label><select id="na-es"><option value="vigilancia">En vigilancia</option><option value="cartera">En cartera</option></select></div>
+          <div class="field"><label>¿Ya la tienes?</label><select id="na-es">
+            <option value="vigilancia">No, solo la vigilo</option>
+            <option value="cartera">Sí, la he comprado</option></select></div>
         </div>
+
         <div id="na-compra" style="display:none">
           <div class="bloque-t">La compra</div>
-          <p class="small mut" style="margin:-4px 0 10px">Sin compra registrada no hay posición, y entonces no puede
-          aparecer en la cartera ni calcularse nada. Si todavía no la has comprado, déjalo en vigilancia.</p>
+          <p class="small mut" style="margin:-4px 0 10px">Sin la compra no hay posición: no saldría en la cartera ni contaría en nada.</p>
           <div class="form-grid">
-            <div class="field"><label>Títulos</label><input type="number" step="any" id="na-ti"></div>
-            <div class="field"><label>Precio de compra</label><input type="number" step="any" id="na-pc"></div>
+            <div class="field"><label>Títulos</label><input type="number" step="any" id="na-ti" placeholder="cuántas acciones o participaciones"></div>
+            <div class="field"><label>Precio por título</label><input type="number" step="any" id="na-pc" placeholder="lo que pagaste por cada una"></div>
             <div class="field"><label>Fecha</label><input type="date" id="na-fe" value="${Util.hoy()}"></div>
             <div class="field"><label>Comisión</label><input type="number" step="any" id="na-co" value="0"></div>
           </div>
+          <p class="small mut" id="na-total" style="margin:8px 0 0"></p>
         </div>
-        <div class="field" style="margin-top:12px"><label>Tesis: por qué te interesa</label>
-          <textarea id="na-ts" placeholder="En dos o tres frases, qué ves tú que no ve el mercado"></textarea></div>`,
-      pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn pri" id="na-ok">Añadir activo</button>`,
+
+        <div class="form-grid" style="margin-top:14px">
+          <div class="field"><label>Precio de hoy <span class="mut">(si lo sabes)</span></label>
+            <input type="number" step="any" id="na-pr" placeholder="para saber cómo va"></div>
+          <div class="field"><label>Lo que crees que vale <span class="mut">(opcional)</span></label>
+            <input type="number" step="any" id="na-bs" placeholder="tu escenario base, en €"></div>
+        </div>
+        <div class="field" style="margin-top:12px"><label>Por qué te interesa <span class="mut">(opcional)</span></label>
+          <textarea id="na-ts" placeholder="En dos o tres frases, qué ves tú que no ve el mercado"></textarea></div>
+
+        <details class="mas-datos">
+          <summary>Más datos: sector, país, ISIN</summary>
+          <div class="form-grid">
+            <div class="field"><label>Sector</label><input id="na-sc"></div>
+            <div class="field"><label>País</label><input id="na-pa"></div>
+            <div class="field"><label>ISIN</label><input id="na-is" autocapitalize="characters"></div>
+          </div>
+        </details>`,
+      pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn pri" id="na-ok">Añadir</button>`,
       alAbrir: () => {
-        /* Buscador del catálogo: rellena los campos de identidad al elegir */
-        const caja = $('#na-buscar'), lista = $('#na-sug');
-        let sug = [], marcado = -1;
-        const pintar = () => {
-          lista.innerHTML = !sug.length ? '' : sug.map((x, i) => `
-            <div class="sug ${i === marcado ? 'on' : ''}" data-sug="${i}">
-              <b>${Util.esc(x.ticker)}</b>
-              <span>${Util.esc(x.nombre)}</span>
-              <em>${TIPOS[x.tipo] || x.tipo}${x.mercado ? ' · ' + Util.esc(x.mercado) : ''}${x.origen === 'cribado' ? ' · del cribado' : ''}</em>
-              ${x.tengo ? '<i class="ya">ya la tienes</i>' : ''}
-            </div>`).join('');
-          lista.style.display = sug.length ? '' : 'none';
-          $$('[data-sug]').forEach(d => d.onclick = () => elegir(sug[+d.dataset.sug]));
-        };
-        const elegir = x => {
-          if (!x) return;
-          if (x.tengo) { Util.toast(`${x.ticker} ya está en tu lista`, 'err'); return; }
+        let tipoTocado = false;
+        $('#na-tp').addEventListener('change', () => { tipoTocado = true; });
+
+        /* Al elegir de la lista se rellena todo lo que sabemos, se cierra el
+           teclado y se baja a lo siguiente que hay que decidir */
+        const rellenar = x => {
           $('#na-tk').value = x.ticker;
           $('#na-nb').value = x.nombre;
           $('#na-tp').value = x.tipo;
           if (x.sector) $('#na-sc').value = x.sector;
           if (x.pais) $('#na-pa').value = x.pais;
-          caja.value = `${x.ticker} · ${x.nombre}`;
-          sug = []; marcado = -1; pintar();
-          $('#na-pr').focus();
+          try {
+            const e = Store.universo().find(u => (u.ticker || '').toUpperCase() === x.ticker.toUpperCase());
+            if (e && Util.n(e.precio) && !$('#na-pr').value) $('#na-pr').value = Util.n(e.precio);
+          } catch (err) {}
+          if (document.activeElement) document.activeElement.blur();
+          avisoTicker();
+          $('#na-es').scrollIntoView({ block: 'center', behavior: 'smooth' });
         };
-        caja.oninput = () => { sug = VALORES.buscar(caja.value, 8); marcado = -1; pintar(); };
-        caja.onkeydown = e => {
-          if (!sug.length) return;
-          if (e.key === 'ArrowDown') { marcado = Math.min(sug.length - 1, marcado + 1); pintar(); e.preventDefault(); }
-          else if (e.key === 'ArrowUp') { marcado = Math.max(0, marcado - 1); pintar(); e.preventDefault(); }
-          else if (e.key === 'Enter') { elegir(sug[marcado < 0 ? 0 : marcado]); e.preventDefault(); }
-          else if (e.key === 'Escape') { sug = []; pintar(); }
+        const filtro = () => tipoTocado ? { tipo: $('#na-tp').value } : null;
+        VALORES.enganchar($('#na-tk'), { elegir: rellenar, filtro });
+        VALORES.enganchar($('#na-nb'), { elegir: rellenar, filtro, avisarVacio: false });
+
+        /* Mientras escribe el ticker, avisar si ya lo tiene */
+        const avisoTicker = () => {
+          const tk = $('#na-tk').value.trim().toUpperCase();
+          const ya = tk && Store.activos().find(a => (a.ticker || '').toUpperCase() === tk);
+          $('#na-tk-aviso').innerHTML = ya
+            ? `<span class="neg">Ya lo tienes (${ya.estado === 'cartera' ? 'en cartera' : 'en vigilancia'}).</span>
+               <a href="#" id="na-abrir-ya">Abrir su ficha</a>` : '';
+          const l = $('#na-abrir-ya');
+          if (l) l.onclick = e => { e.preventDefault(); Modal.cerrar(); setTimeout(() => Ficha.abrir(ya.id), 220); };
         };
-        /* Los campos de la compra solo cuando dice que ya la tiene */
+        $('#na-tk').addEventListener('input', avisoTicker);
+
+        /* Los datos de la compra solo si ya la tiene */
         const vista = () => {
           const cartera = $('#na-es').value === 'cartera';
           $('#na-compra').style.display = cartera ? '' : 'none';
-          if (cartera && !$('#na-pc').value) $('#na-pc').value = $('#na-pr').value;
+          if (cartera) setTimeout(() => $('#na-compra').scrollIntoView({ block: 'start', behavior: 'smooth' }), 60);
         };
         $('#na-es').onchange = vista;
-        $('#na-pr').onchange = () => { if (!$('#na-pc').value) $('#na-pc').value = $('#na-pr').value; };
-        vista();
+        const total = () => {
+          const t = Util.n($('#na-ti').value), p = Util.n($('#na-pc').value), c = Util.n($('#na-co').value);
+          $('#na-total').textContent = t && p ? `Total pagado: ${Util.eur(t * p + c, 2)}` : '';
+        };
+        ['#na-ti', '#na-pc', '#na-co'].forEach(s => $(s).addEventListener('input', total));
+
         $('#na-ok').onclick = () => {
-        const tk = $('#na-tk').value.trim().toUpperCase();
-        if (!tk) { Util.toast('Hace falta al menos un ticker', 'err'); return; }
-        /* Un mismo ticker dos veces parte el histórico en dos fichas */
-        const ya = Store.activos().find(x => (x.ticker || '').toUpperCase() === tk);
-        if (ya) {
-          Modal.cerrar();
-          Util.toast(`${tk} ya lo tienes: te abro su ficha`, 'err');
-          setTimeout(() => Ficha.abrir(ya.id), 260);
-          return;
-        }
-        const enCartera = $('#na-es').value === 'cartera';
-        const tit = Util.n($('#na-ti').value);
-        if (enCartera && tit <= 0) {
-          Util.toast('Pon cuántos títulos compraste, o déjalo en vigilancia', 'err');
-          $('#na-ti').focus(); return;
-        }
-        const base = Util.n($('#na-bs').value);
-        Store.activos().push(Store.normalizar({
-          activos: [{
-            id: Util.uid('ac'), ticker: tk, nombre: $('#na-nb').value.trim() || tk,
-            tipo: $('#na-tp').value, sector: $('#na-sc').value.trim(), pais: $('#na-pa').value.trim(),
-            isin: $('#na-is').value.trim(), estado: $('#na-es').value, divisa: 'EUR', fx: 1, mercado: '',
-            tesis: { resumen: $('#na-ts').value.trim(), fecha: Util.hoy(), horizonte: '', hipotesis: [], riesgos: [], catalizadores: [], premortem: '' },
-            valoracion: { metodo: '', bear: { precio: base * 0.7, prob: 25 }, base: { precio: base, prob: 55 }, bull: { precio: base * 1.3, prob: 20 }, notas: '' },
-            cotizacion: { precio: Util.n($('#na-pr').value), fecha: Util.hoy(), max52: 0, min52: 0, per: 0, fcfYield: 0, divYield: 0, ter: 0 },
-            fundamentales: [], seguimiento: { cadencia: 6, ultimaRevision: '', proximaRevision: '', fuentes: '' },
-            checklist: { fecha: '', respuestas: {} }, notas: '', historial: []
-          }]
-        }).activos[0]);
-        const nuevo = Store.activos()[Store.activos().length - 1];
-        if (enCartera) {
-          Store.ops().push({
-            id: Util.uid('op'), activoId: nuevo.id, tipo: 'compra',
-            fecha: $('#na-fe').value || Util.hoy(), titulos: tit,
-            precio: Util.n($('#na-pc').value) || Util.n($('#na-pr').value),
-            comision: Util.n($('#na-co').value), importe: 0, retencion: 0, nota: 'Alta del activo'
-          });
-        }
-        Store.save(); Modal.cerrar();
-        Util.toast(enCartera ? `${tk} añadido con ${Util.num(tit, 0)} títulos` : `${tk} añadido a vigilancia`);
-        }
+          const tk = $('#na-tk').value.trim().toUpperCase();
+          if (!tk) { Util.toast('Falta el ticker', 'err'); $('#na-tk').focus(); return; }
+          /* Un mismo ticker dos veces parte el histórico en dos fichas */
+          const ya = Store.activos().find(x => (x.ticker || '').toUpperCase() === tk);
+          if (ya) {
+            Modal.cerrar();
+            Util.toast(`${tk} ya lo tienes: te abro su ficha`, 'err');
+            setTimeout(() => Ficha.abrir(ya.id), 260);
+            return;
+          }
+          /* Si escribió el ticker a mano y está en la lista, completo lo que falte */
+          const cat = VALORES.exacto(tk);
+          if (cat) {
+            if (!$('#na-nb').value.trim()) $('#na-nb').value = cat.nombre;
+            if (!tipoTocado && $('#na-tp').value === 'accion' && cat.tipo !== 'accion') $('#na-tp').value = cat.tipo;
+          }
+          const enCartera = $('#na-es').value === 'cartera';
+          const tit = Util.n($('#na-ti').value);
+          const pc = Util.n($('#na-pc').value);
+          if (enCartera && tit <= 0) { Util.toast('Pon cuántos títulos compraste', 'err'); $('#na-ti').focus(); return; }
+          if (enCartera && pc <= 0) { Util.toast('Pon a qué precio los compraste', 'err'); $('#na-pc').focus(); return; }
+          const base = Util.n($('#na-bs').value);
+          /* Si no sabe el precio de hoy, el de compra es mejor que nada */
+          const precioHoy = Util.n($('#na-pr').value) || (enCartera ? pc : 0);
+          Store.marcar(`Añadir ${tk}`);
+          Store.activos().push(Store.normalizar({
+            activos: [{
+              id: Util.uid('ac'), ticker: tk, nombre: $('#na-nb').value.trim() || tk,
+              tipo: $('#na-tp').value, sector: $('#na-sc').value.trim(), pais: $('#na-pa').value.trim(),
+              isin: $('#na-is').value.trim().toUpperCase(), estado: $('#na-es').value, divisa: 'EUR', fx: 1, mercado: cat ? cat.mercado : '',
+              tesis: { resumen: $('#na-ts').value.trim(), fecha: Util.hoy(), horizonte: '', hipotesis: [], riesgos: [], catalizadores: [], premortem: '' },
+              valoracion: { metodo: '', bear: { precio: base * 0.7, prob: 25 }, base: { precio: base, prob: 55 }, bull: { precio: base * 1.3, prob: 20 }, notas: '' },
+              cotizacion: { precio: precioHoy, fecha: Util.hoy(), max52: 0, min52: 0, per: 0, fcfYield: 0, divYield: 0, ter: 0 },
+              fundamentales: [], seguimiento: { cadencia: 6, ultimaRevision: '', proximaRevision: '', fuentes: '' },
+              checklist: { fecha: '', respuestas: {} }, notas: '', historial: []
+            }]
+          }).activos[0]);
+          const nuevo = Store.activos()[Store.activos().length - 1];
+          if (enCartera) {
+            Store.ops().push({
+              id: Util.uid('op'), activoId: nuevo.id, tipo: 'compra',
+              fecha: $('#na-fe').value || Util.hoy(), titulos: tit, precio: pc,
+              comision: Util.n($('#na-co').value), importe: 0, retencion: 0, nota: 'Alta del activo'
+            });
+          }
+          Store.save(); Modal.cerrar();
+          Util.toast(enCartera ? `${tk} en cartera con ${Util.num(tit, tit % 1 ? 2 : 0)} títulos` : `${tk} añadido a vigilancia`);
+        };
       }
     });
   }
@@ -7094,6 +7623,114 @@ const Tomas = (() => {
   return { manual, importar, exportar };
 })();
 
+
+/* ═══════════════ BLOQUES DENTRO DE UNA PESTAÑA ═══════════════
+   Las pestañas fusionadas son largas: una barra de botones arriba lleva a
+   cada bloque, se queda pegada bajo las pestañas y marca dónde estás. */
+const Bloques = (() => {
+  let pendiente = false;
+  const tabs = () => document.querySelector('.tabs');
+  function alto() {
+    const t = tabs();
+    return t ? Math.max(0, Math.round(t.getBoundingClientRect().bottom)) : 0;
+  }
+  function medir() {
+    document.documentElement.style.setProperty('--subnav-top', alto() + 'px');
+    marcar();
+  }
+  function panelActivo() { return document.querySelector('.panel.on'); }
+  function marcar() {
+    if (Date.now() < fijado) return;
+    const p = panelActivo(); if (!p) return;
+    const nav = p.querySelector('.subnav'); if (!nav) return;
+    const corte = nav.getBoundingClientRect().bottom + 24;
+    const bs = [...p.querySelectorAll('.bloque-sec')];
+    let actual = bs[0] && bs[0].id;
+    bs.forEach(b => { if (b.getBoundingClientRect().top <= corte) actual = b.id; });
+    /* Al final de la página, el último bloque aunque sea corto */
+    if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4 && bs.length) actual = bs[bs.length - 1].id;
+    nav.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.bloque === actual));
+  }
+  let fijado = 0;
+  function ir(id) {
+    const b = document.getElementById(id); if (!b) return;
+    /* Marcar ya el botón pulsado, y que el desplazamiento suave no lo cambie */
+    const navB = b.closest('.panel').querySelectorAll('.subnav [data-bloque]');
+    navB.forEach(x => x.classList.toggle('on', x.dataset.bloque === id));
+    fijado = Date.now() + 1400;
+    const nav = b.closest('.panel').querySelector('.subnav');
+    const tope = alto() + (nav ? nav.offsetHeight : 0) + 10;
+    window.scrollTo({ top: Math.max(0, b.getBoundingClientRect().top + window.scrollY - tope), behavior: 'smooth' });
+    /* Si la cabecera del móvil se esconde o reaparece a mitad del viaje, la
+       barra cambia de sitio: al acabar, se corrige lo que falte */
+    const corregir = () => {
+      const n = nav ? nav.getBoundingClientRect().bottom : alto();
+      const d = b.getBoundingClientRect().top - n - 10;
+      if (Math.abs(d) > 4) window.scrollBy(0, d);
+    };
+    setTimeout(corregir, 700);
+    setTimeout(corregir, 1150);
+  }
+  function init() {
+    document.addEventListener('click', e => {
+      const b = e.target.closest('.subnav [data-bloque]');
+      if (b) { e.preventDefault(); ir(b.dataset.bloque); }
+    });
+    const tick = () => { if (pendiente) return; pendiente = true; requestAnimationFrame(() => { pendiente = false; medir(); }); };
+    window.addEventListener('scroll', tick, { passive: true });
+    window.addEventListener('resize', tick);
+    /* La cabecera del móvil se encoge con animación: volver a medir al acabar */
+    const tb = document.querySelector('.topbar');
+    if (tb) tb.addEventListener('transitionend', tick);
+    if (window.ResizeObserver && tabs()) new ResizeObserver(tick).observe(tabs());
+    /* Cuando la cabecera del móvil se encoge sola (sin que se mueva la página),
+       las pestañas suben: hay que volver a pegar la barra debajo */
+    if (window.ResizeObserver && tb) new ResizeObserver(tick).observe(tb);
+    if (window.MutationObserver) new MutationObserver(() => { tick(); setTimeout(tick, 280); })
+      .observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    medir();
+  }
+  return { init, ir, medir };
+})();
+
+/* ═══════════════ CARTERA REAL O DE PAPEL ═══════════════
+   Siempre arranca en la real. El papel se distingue por todos lados y la
+   cabecera avisa de que sus cifras son las reales. */
+const ModoCartera = (() => {
+  let modo = 'real';
+  function aplicar() {
+    const papel = modo === 'papel';
+    const r = document.getElementById('cartera-real'), p = document.getElementById('cartera-papel');
+    if (r) r.hidden = papel;
+    if (p) p.hidden = !papel;
+    document.querySelectorAll('.modo-cartera [data-modo]').forEach(b => {
+      const on = b.dataset.modo === modo;
+      b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    const enCartera = !!document.querySelector('.panel.on[data-panel="cartera"]');
+    document.body.classList.toggle('en-papel', papel && enCartera);
+    if (papel && typeof Papel !== 'undefined') Papel.render();
+    Bloques.medir();
+  }
+  function poner(m, subir) {
+    modo = m === 'papel' ? 'papel' : 'real';
+    aplicar();
+    if (subir) {
+      const panel = document.querySelector('[data-panel="cartera"]');
+      if (panel) window.scrollTo({ top: Math.max(0, panel.getBoundingClientRect().top + window.scrollY - 120), behavior: 'smooth' });
+    }
+  }
+  function init() {
+    document.addEventListener('click', e => {
+      const b = e.target.closest('.modo-cartera [data-modo], [data-modo-ir]');
+      if (!b) return;
+      poner(b.dataset.modo || b.dataset.modoIr, !!b.dataset.modoIr);
+    });
+    aplicar();
+  }
+  return { init, poner, aplicar, actual: () => modo };
+})();
+
 /* ═══════════════ CABECERA EN EL MÓVIL ═══════════════
    En una pantalla pequeña la barra de cifras ocupa un tercio del alto y
    te sigue en todas las pestañas. Aquí se decide qué hace al bajar. */
@@ -7117,7 +7754,11 @@ const Pantalla = (() => {
     }
     if (modo === 'mini') {
       b.classList.remove('hdr-fuera');
-      b.classList.toggle('hdr-mini', y > 56);
+      /* Margen entre encoger (al pasar de 90) y crecer (por debajo de 12): con
+         un solo umbral, el cambio de altura movía la página al otro lado del
+         umbral y la cabecera temblaba sin parar */
+      if (y > 90) b.classList.add('hdr-mini');
+      else if (y < 12) b.classList.remove('hdr-mini');
     } else {
       b.classList.remove('hdr-mini');
       if (y < 70) b.classList.remove('hdr-fuera');
@@ -7231,6 +7872,8 @@ const App = (() => {
     t.classList.add('on');
     $(`[data-panel="${t.dataset.tab}"]`).classList.add('on');
     Pantalla.alCambiarPestana();
+    ModoCartera.aplicar();
+    Bloques.medir();
   });
 
   function cambiarTema() {
@@ -7325,6 +7968,21 @@ const App = (() => {
 
   Vistas.refrescar();
   Pantalla.init();
+  /* Los gráficos se dibujan al ancho de la pantalla: si cambia (girar el
+     móvil, pasar de una columna a dos), se vuelven a dibujar */
+  (() => {
+    let ancho = window.innerWidth, t = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        if (Math.abs(window.innerWidth - ancho) < 40) return;
+        ancho = window.innerWidth;
+        Vistas.refrescar();
+      }, 250);
+    });
+  })();
+  Bloques.init();
+  ModoCartera.init();
   App.init();
   if (typeof Nube !== 'undefined') Nube.init();
   Store.autocopia(true);

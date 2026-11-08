@@ -26,6 +26,9 @@ const Papel = (() => {
     if (!d.papel || typeof d.papel !== 'object') d.papel = {};
     if (!Array.isArray(d.papel.carteras)) d.papel.carteras = [];
     if (!d.papel.precios || typeof d.papel.precios !== 'object') d.papel.precios = {};
+    /* Precios con fecha, ticker a ticker: con ellos se dibuja la curva de cada
+       estrategia. Cada punto lleva id para que dos aparatos se junten sin pisarse */
+    if (!d.papel.historial || typeof d.papel.historial !== 'object' || Array.isArray(d.papel.historial)) d.papel.historial = {};
     d.papel.carteras.forEach(c => {
       c.id = c.id || uid('pc');
       c.nombre = c.nombre || 'Sin nombre';
@@ -62,6 +65,80 @@ const Papel = (() => {
       if (e && Number(e.precio)) return { precio: Number(e.precio), fecha: '', de: 'el cribado' };
     } catch (err) {}
     return { precio: 0, fecha: '', de: '' };
+  }
+
+  function apuntarPrecio(tk, f, v) {
+    tk = String(tk || '').toUpperCase(); v = Number(v);
+    if (!tk || !f || !(v > 0)) return;
+    const h = raiz().historial;
+    const L = h[tk] = Array.isArray(h[tk]) ? h[tk] : [];
+    const id = tk + '@' + f;
+    const ya = L.find(x => x.id === id);
+    if (ya) ya.v = v; else L.push({ id, f, v });
+    L.sort((a, b) => a.f.localeCompare(b.f));
+  }
+
+  /* Todos los precios con fecha que sabemos de un valor: los apuntados aquí,
+     los de cada compra y venta de papel, el histórico de su ficha si la tienes
+     y el precio de hoy */
+  function puntosPrecio(tk) {
+    tk = String(tk || '').toUpperCase();
+    const m = new Map();
+    const pon = (f, v) => { if (f && Number(v) > 0) m.set(f, Number(v)); };
+    const a = Store.activos().find(x => (x.ticker || '').toUpperCase() === tk);
+    if (a) {
+      (a.serie || []).forEach(t => pon(t.fecha, t.precio));
+      pon(a.cotizacion.fecha, a.cotizacion.precio);
+    }
+    carteras().forEach(c => c.operaciones.forEach(o => { if (o.ticker === tk) pon(o.fecha, o.precio); }));
+    (raiz().historial[tk] || []).forEach(p => pon(p.f, p.v));
+    const hoyP = precio(tk);
+    if (hoyP.precio && !m.has(hoy())) pon(hoyP.fecha || hoy(), hoyP.precio);
+    return [...m.entries()].map(([f, v]) => ({ f, v })).sort((x, y) => x.f.localeCompare(y.f));
+  }
+
+  /* Precio en una fecha: el exacto si lo hay; si no, la recta entre los dos
+     conocidos más cercanos, marcado como estimado para no engañar */
+  function precioEn(pts, f) {
+    if (!pts.length) return { v: 0, est: true };
+    if (f <= pts[0].f) return { v: pts[0].v, est: f !== pts[0].f };
+    const last = pts[pts.length - 1];
+    if (f >= last.f) return { v: last.v, est: f !== last.f };
+    for (let i = 1; i < pts.length; i++) {
+      if (pts[i].f === f) return { v: pts[i].v, est: false };
+      if (pts[i].f > f) {
+        const a = pts[i - 1], b = pts[i];
+        const ta = new Date(a.f).getTime(), tb = new Date(b.f).getTime(), t = new Date(f).getTime();
+        return { v: a.v + (b.v - a.v) * (t - ta) / (tb - ta), est: true };
+      }
+    }
+    return { v: last.v, est: true };
+  }
+
+  /* Valor de una cartera de papel a lo largo del tiempo, en euros y en base
+     100 sobre el dinero inicial. Aquí no entra ni sale dinero tras el primer
+     día, así que la base 100 ya es una rentabilidad limpia. */
+  function serie(c) {
+    const ops = c.operaciones.slice().sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+    const tks = [...new Set(ops.map(o => o.ticker))];
+    const pts = {}; tks.forEach(t => { pts[t] = puntosPrecio(t); });
+    const fechas = [...new Set([c.creada, hoy(), ...ops.map(o => o.fecha),
+      ...tks.flatMap(t => pts[t].map(p => p.f))])].filter(f => f && f >= c.creada && f <= hoy()).sort();
+    return fechas.map(f => {
+      let caja = c.capital; const tit = {};
+      ops.filter(o => o.fecha <= f).forEach(o => {
+        if (o.tipo === 'compra') { caja -= o.titulos * o.precio + o.comision; tit[o.ticker] = (tit[o.ticker] || 0) + o.titulos; }
+        else { caja += o.titulos * o.precio - o.comision; tit[o.ticker] = (tit[o.ticker] || 0) - o.titulos; }
+      });
+      let valor = caja, est = false;
+      Object.keys(tit).forEach(t => {
+        if (tit[t] <= 0.0000001) return;
+        const p = precioEn(pts[t], f);
+        if (p.est) est = true;
+        valor += tit[t] * p.v;
+      });
+      return { fecha: f, valor, base: c.capital > 0 ? valor / c.capital * 100 : 100, est };
+    });
   }
 
   /* ---------- Cuentas ---------- */
@@ -152,7 +229,7 @@ const Papel = (() => {
     z.innerHTML = `
       <div class="card no-print">
         <div class="card-h">
-          <h3>Carteras de papel</h3>
+          <h3><span class="papel-sello">Papel</span>Carteras imaginarias</h3>
           <div class="sub">${rs.length ? `${rs.length} ${rs.length === 1 ? 'método' : 'métodos'} en marcha` : 'Dinero imaginario para probar métodos sin arriesgar nada'}</div>
           <div class="toolbar"><button class="btn pri" id="pa-nueva">Nueva cartera</button></div>
         </div>
@@ -180,6 +257,7 @@ const Papel = (() => {
     });
     $$('[data-pa-precio]').forEach(i => i.onchange = () => {
       raiz().precios[i.dataset.paPrecio] = { precio: Util.n(i.value), fecha: hoy() };
+      apuntarPrecio(i.dataset.paPrecio, hoy(), Util.n(i.value));
       Store.save();
     });
   }
@@ -206,10 +284,30 @@ const Papel = (() => {
             <button class="btn mini" data-pa-ver="${r.c.id}">Ver</button>
             <button class="btn mini" data-pa-ed="${r.c.id}">Editar</button>
             <button class="btn mini" data-pa-del="${r.c.id}">Borrar</button></td>
-        </tr>`).join('')}</tbody></table></div>
+        </tr>`).join('')}
+        ${referencias()}</tbody></table></div>
       ${orden.length > 1 ? `<p class="small mut" style="margin:10px 0 0">Compara «Al año», no «Gana»: una cartera de hace
         tres años y otra de hace dos meses no son comparables en total. Y con menos de veinte operaciones cerradas,
         el porcentaje de aciertos dice más de la suerte que del método.</p>` : ''}`;
+  }
+
+  /* Dos filas grises para saber si un método merece la pena: no basta con
+     ganar a los demás métodos, hay que ganar a no hacer nada (el índice) */
+  function referencias() {
+    let r = null;
+    try { r = Calc.rendimiento(); } catch (e) {}
+    if (!r) return `<tr class="ref"><td class="tick" colspan="9"><small>Tu cartera real y el índice saldrán aquí como referencia
+      en cuanto haya operaciones reales y precios de la referencia (pestaña Análisis).</small></td></tr>`;
+    const fila = (nombre, sub, total, anual) => `
+      <tr class="ref">
+        <td class="tick">${nombre}<small>${sub}</small></td>
+        <td class="r num">—</td><td class="r num">—</td>
+        <td class="r num ${total >= 0 ? 'pos' : 'neg'}">${Util.signo(total)} %</td>
+        <td class="r num ${anual >= 0 ? 'pos' : 'neg'}">${Util.signo(anual)} %</td>
+        <td colspan="4" class="small mut">referencia</td>
+      </tr>`;
+    return fila('Tu cartera real', `desde ${Util.fecha(r.desde)} · sin contar cuándo metiste el dinero`, r.twr, r.twrAnual)
+      + (r.ref ? fila(Util.esc(r.ref.nombre), 'el índice en el mismo periodo', r.indice, r.indiceAnual) : '');
   }
 
   function detalle(r) {
@@ -217,7 +315,7 @@ const Papel = (() => {
     return `
       <div class="card">
         <div class="card-h">
-          <h3>${Util.esc(c.nombre)}</h3>
+          <h3><span class="papel-sello">Papel</span>${Util.esc(c.nombre)}</h3>
           <div class="sub">${Util.esc(c.metodo || 'Sin método escrito')}</div>
           <div class="toolbar">
             <button class="btn" data-pa-op="${c.id}" data-pa-tipo="venta">Vender</button>
@@ -304,7 +402,7 @@ const Papel = (() => {
   function editar(id) {
     const c = id ? cartera(id) : null;
     Modal.abrir({
-      titulo: c ? 'Editar la cartera' : 'Nueva cartera de papel',
+      titulo: c ? 'Papel · Editar la cartera' : 'Papel · Nueva cartera imaginaria', clase: 'papel',
       cuerpo: `<div class="form-grid">
           <div class="field"><label>Nombre del método</label>
             <input id="pa-nb" placeholder="PER bajo en small caps" value="${c ? Util.esc(c.nombre) : ''}"></div>
@@ -336,7 +434,7 @@ const Papel = (() => {
           raiz().activa = nueva.id;
         }
         Store.save(); Modal.cerrar();
-        Util.toast(c ? 'Cartera guardada' : `«${nb}» en marcha`);
+        Util.toast(c ? 'Cartera de papel guardada' : `Cartera de papel «${nb}» en marcha`);
       }
     });
   }
@@ -344,7 +442,7 @@ const Papel = (() => {
   function borrar(id) {
     const c = cartera(id);
     Modal.abrir({
-      titulo: `Borrar «${c.nombre}»`,
+      titulo: `Papel · Borrar «${c.nombre}»`, clase: 'papel',
       cuerpo: `<p>Se va con sus ${c.operaciones.length} ${c.operaciones.length === 1 ? 'operación' : 'operaciones'}.</p>
         <p class="small mut" style="margin-top:10px">Si lo que quieres es dejar de tocarla pero conservar el resultado
         para comparar, mejor edítala y márcala como «cerrada».</p>
@@ -355,28 +453,41 @@ const Papel = (() => {
         const L = carteras();
         L.splice(L.findIndex(x => x.id === id), 1);
         if (raiz().activa === id) raiz().activa = (L[0] || {}).id || '';
-        Store.save(); Modal.cerrar(); Util.toast('Cartera borrada');
+        Store.save(); Modal.cerrar(); Util.toast('Cartera de papel borrada');
       }
     });
   }
 
   /* ---------- Comprar y vender ---------- */
-  function operar(id, tipo, tkPrevio) {
+  /* «Probar en papel» desde la lista de vigilancia */
+  function probar(tk, nombre) {
+    if (!carteras().length) {
+      Util.toast('Crea antes una cartera de papel: una por método que quieras probar', 'err');
+      if (typeof ModoCartera !== 'undefined') ModoCartera.poner('papel');
+      setTimeout(() => editar(null), 250);
+      return;
+    }
+    operar(raiz().activa && cartera(raiz().activa) ? raiz().activa : carteras()[0].id, 'compra', tk, { elegir: true, nombre });
+  }
+
+  function operar(id, tipo, tkPrevio, extra) {
+    extra = extra || {};
     const c = cartera(id);
-    const r = calcular(c);
+    let r = calcular(c);
     const venta = tipo === 'venta';
     if (venta && !r.posiciones.length) { Util.toast('No hay nada que vender todavía', 'err'); return; }
 
     Modal.abrir({
-      titulo: venta ? `Vender en «${c.nombre}»` : `Comprar en «${c.nombre}»`,
+      titulo: venta ? `Papel · Vender en «${c.nombre}»` : `Papel · Comprar en «${c.nombre}»`, clase: 'papel',
       cuerpo: `
         ${venta ? `<div class="field"><label>Qué vendo</label>
             <select id="pa-otk">${r.posiciones.map(p => `<option value="${Util.esc(p.ticker)}" ${p.ticker === tkPrevio ? 'selected' : ''}>
               ${Util.esc(p.ticker)} · ${Util.num(p.titulos, 0)} títulos a ${Util.num(p.costeMedio)} de coste</option>`).join('')}</select></div>`
-          : `<div class="field buscador"><label>Qué compro</label>
-            <input id="pa-obuscar" placeholder="Nombre o ticker" autocomplete="off">
-            <div id="pa-osug" class="sugerencias"></div></div>
-            <div class="field" style="margin-top:10px"><label>Ticker</label><input id="pa-otk" placeholder="ITX"></div>`}
+          : `${extra.elegir && carteras().length > 1 ? `<div class="field" style="margin-bottom:12px"><label>En qué cartera de papel</label>
+            <select id="pa-ocar">${carteras().filter(x => !x.cerrada || x.id === c.id).map(x => `<option value="${x.id}" ${x.id === c.id ? 'selected' : ''}>${Util.esc(x.nombre)}</option>`).join('')}</select></div>` : ''}
+            <div class="field"><label>Qué compro</label>
+            <input id="pa-otk" placeholder="Escribe el ticker o el nombre y elige" value="${tkPrevio && !venta ? Util.esc(tkPrevio) : ''}">
+            <div class="small mut" id="pa-onb" style="margin-top:5px">${extra.nombre ? Util.esc(extra.nombre) : ''}</div></div>`}
         <div class="form-grid" style="margin-top:12px">
           <div class="field"><label>Títulos</label><input type="number" step="any" id="pa-oti"></div>
           <div class="field"><label>Precio</label><input type="number" step="any" id="pa-opr"></div>
@@ -386,10 +497,10 @@ const Papel = (() => {
         <div class="field" style="margin-top:12px"><label>Por qué lo hago</label>
           <input id="pa-ono" placeholder="Lo que te va a servir dentro de un año para entender la decisión"></div>
         <p class="small mut" id="pa-oinfo" style="margin-top:12px"></p>`,
-      pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn pri" id="pa-ook">${venta ? 'Apuntar la venta' : 'Apuntar la compra'}</button>`,
+      pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn pri" id="pa-ook">${venta ? 'Apuntar venta imaginaria' : 'Apuntar compra imaginaria'}</button>`,
       alAbrir: () => {
         const info = $('#pa-oinfo');
-        const tkDe = () => (venta ? $('#pa-otk').value : $('#pa-otk').value.trim().toUpperCase());
+        const tkDe = () => (venta ? $('#pa-otk').value : $('#pa-otk').value.split('·')[0].trim().toUpperCase());
         const ponPrecio = () => {
           const pr = precio(tkDe());
           if (pr.precio && !$('#pa-opr').value) $('#pa-opr').value = pr.precio;
@@ -410,24 +521,21 @@ const Papel = (() => {
           const p0 = r.posiciones.find(p => p.ticker === $('#pa-otk').value);
           if (p0) $('#pa-oti').value = p0.titulos;
         } else if (typeof VALORES !== 'undefined') {
-          /* El mismo buscador del catálogo que en «Añadir activo» */
-          const caja = $('#pa-obuscar'), lista = $('#pa-osug');
-          let sug = [];
-          const pintar = () => {
-            lista.innerHTML = sug.map((x, i) => `<div class="sug" data-psug="${i}">
-              <b>${Util.esc(x.ticker)}</b><span>${Util.esc(x.nombre)}</span>
-              <em>${x.mercado ? Util.esc(x.mercado) : ''}</em></div>`).join('');
-            lista.style.display = sug.length ? '' : 'none';
-            $$('[data-psug]').forEach(d => d.onclick = () => {
-              const x = sug[+d.dataset.psug];
+          /* El mismo buscador que en «Añadir activo»: se escribe en el propio campo */
+          VALORES.enganchar($('#pa-otk'), {
+            elegir: x => {
               $('#pa-otk').value = x.ticker;
-              caja.value = `${x.ticker} · ${x.nombre}`;
-              sug = []; pintar(); ponPrecio(); refrescaInfo(); $('#pa-oti').focus();
-            });
-          };
-          caja.oninput = () => { sug = VALORES.buscar(caja.value, 6); pintar(); };
-          $('#pa-otk').onchange = () => { ponPrecio(); refrescaInfo(); };
+              $('#pa-onb').textContent = x.nombre;
+              $('#pa-opr').value = '';
+              ponPrecio(); refrescaInfo();
+              if (document.activeElement) document.activeElement.blur();
+            }
+          });
+          $('#pa-otk').addEventListener('input', () => { $('#pa-onb').textContent = ''; });
+          $('#pa-otk').addEventListener('change', () => { ponPrecio(); refrescaInfo(); });
         }
+        /* Si cambia de cartera, las cuentas de «sin invertir» son de la nueva */
+        if ($('#pa-ocar')) $('#pa-ocar').onchange = () => { r = calcular(cartera($('#pa-ocar').value)); refrescaInfo(); };
         ponPrecio(); refrescaInfo();
 
         $('#pa-ook').onclick = () => {
@@ -442,20 +550,23 @@ const Papel = (() => {
               Util.toast(`Solo tienes ${Util.num((p || {}).titulos || 0, 0)} títulos de ${tk}`, 'err'); return;
             }
           }
-          Store.marcar(`${venta ? 'Venta' : 'Compra'} de papel en «${c.nombre}»`);
-          c.operaciones.push({
+          const destino = ($('#pa-ocar') && cartera($('#pa-ocar').value)) || c;
+          Store.marcar(`${venta ? 'Venta' : 'Compra'} de papel en «${destino.nombre}»`);
+          destino.operaciones.push({
             id: uid('po'), ticker: tk, tipo: venta ? 'venta' : 'compra',
             fecha: $('#pa-ofe').value || hoy(), titulos: tit, precio: pre,
             comision: Util.n($('#pa-oco').value), nota: $('#pa-ono').value.trim()
           });
           /* De paso guardo el precio para que la valoración no quede coja */
           if (!raiz().precios[tk]) raiz().precios[tk] = { precio: pre, fecha: $('#pa-ofe').value || hoy() };
+          apuntarPrecio(tk, $('#pa-ofe').value || hoy(), pre);
           Store.save(); Modal.cerrar();
-          Util.toast(`${venta ? 'Venta' : 'Compra'} apuntada en «${c.nombre}»`);
+          raiz().activa = destino.id;
+          Util.toast(`${venta ? 'Venta' : 'Compra'} imaginaria apuntada en «${destino.nombre}»`);
         };
       }
     });
   }
 
-  return { render, calcular, todas, raiz, carteras, precio };
+  return { render, calcular, todas, raiz, carteras, cartera, precio, serie, probar, apuntarPrecio };
 })();

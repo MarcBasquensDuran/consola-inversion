@@ -515,6 +515,8 @@ const VALORES = (() => {
 ['CSPX','iShares Core S&P 500 UCITS ETF Acc','etf','Londres'],
 ['SXR8','iShares Core S&P 500 UCITS ETF Acc','etf','Xetra'],
 ['VUSA','Vanguard S&P 500 UCITS ETF Dist','etf','Ámsterdam'],
+['ISF','iShares Core FTSE 100 UCITS ETF','etf','Londres'],
+['VUKE','Vanguard FTSE 100 UCITS ETF','etf','Londres'],
 ['VUAA','Vanguard S&P 500 UCITS ETF Acc','etf','Xetra'],
 ['EQQQ','Invesco EQQQ Nasdaq-100 UCITS ETF','etf','Ámsterdam'],
 ['CNDX','iShares Nasdaq 100 UCITS ETF Acc','etf','Londres'],
@@ -546,27 +548,27 @@ const VALORES = (() => {
 ['SGLN','iShares Physical Gold ETC','etf','Londres'],
 ['4GLD','Xetra-Gold','etf','Xetra'],
 ['LYXIB','Amundi IBEX 35 UCITS ETF','etf','Madrid'],
-['BBVAI','BBVA Bolsa Índice FI','fondo','Fondo'],
-['VANGEUR','Vanguard European Stock Index Fund','fondo','Fondo'],
-['VANGGLB','Vanguard Global Stock Index Fund','fondo','Fondo'],
-['VANGSP5','Vanguard U.S. 500 Stock Index Fund','fondo','Fondo'],
-['VANGEM','Vanguard Emerging Markets Stock Index Fund','fondo','Fondo'],
-['VANGJAP','Vanguard Japan Stock Index Fund','fondo','Fondo'],
-['VANGGB','Vanguard Global Bond Index Fund','fondo','Fondo'],
-['AMUNDIW','Amundi Index MSCI World','fondo','Fondo'],
-['AMUNDIEM','Amundi Index MSCI Emerging Markets','fondo','Fondo'],
-['FIDEUR','Fidelity MSCI Europe Index Fund','fondo','Fondo'],
-['ISHWLD','iShares Developed World Index Fund','fondo','Fondo'],
-['BESTINFON','Bestinfond','fondo','Fondo'],
-['BESTINVER','Bestinver Internacional','fondo','Fondo'],
-['COBAS','Cobas Internacional','fondo','Fondo'],
-['AZVALOR','azValor Internacional','fondo','Fondo'],
-['MAGALLANES','Magallanes European Equity','fondo','Fondo'],
-['HORIZON','Horos Value Internacional','fondo','Fondo'],
-['TRUEVALUE','True Value','fondo','Fondo'],
-['NUMANTIA','Numantia Patrimonio Global','fondo','Fondo'],
-['SEILERN','Seilern World Growth','fondo','Fondo'],
-['FUNDSMITH','Fundsmith Equity Fund','fondo','Fondo'],
+['BBVAI','BBVA Bolsa Índice FI','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['VANGEUR','Vanguard European Stock Index Fund','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['VANGGLB','Vanguard Global Stock Index Fund','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['VANGSP5','Vanguard U.S. 500 Stock Index Fund','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['VANGEM','Vanguard Emerging Markets Stock Index Fund','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['VANGJAP','Vanguard Japan Stock Index Fund','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['VANGGB','Vanguard Global Bond Index Fund','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['AMUNDIW','Amundi Index MSCI World','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['AMUNDIEM','Amundi Index MSCI Emerging Markets','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['FIDEUR','Fidelity MSCI Europe Index Fund','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['ISHWLD','iShares Developed World Index Fund','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['BESTINFON','Bestinfond','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['BESTINVER','Bestinver Internacional','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['COBAS','Cobas Internacional','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['AZVALOR','azValor Internacional','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['MAGALLANES','Magallanes European Equity','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['HORIZON','Horos Value Internacional','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['TRUEVALUE','True Value','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['NUMANTIA','Numantia Patrimonio Global','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['SEILERN','Seilern World Growth','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
+['FUNDSMITH','Fundsmith Equity Fund','fondo','sin ticker oficial: pon su ISIN en «Más datos»'],
 
   ];
 
@@ -599,27 +601,112 @@ const VALORES = (() => {
     return base.concat(extra);
   }
 
-  /* Devuelve lo que mejor encaja, con el ticker exacto primero */
-  function buscar(q, tope) {
-    const t = llano(q).trim();
-    if (t.length < 1) return [];
+  /* Devuelve lo que mejor encaja. El orden importa más que la cantidad:
+       0  ticker exacto              («ITX»)
+       1  ticker que empieza así     («FT» → FTNT)
+       2  nombre que empieza así     («tele» → Telefónica)
+       3  alguna palabra del nombre empieza así  («FT» → Vanguard FTSE…)
+       4  el ticker lo contiene
+       5  el nombre lo contiene, solo desde tres letras: con dos, «ft»
+          sacaría Microsoft y Lufthansa, que no es lo que buscas
+     Varias palabras se buscan todas a la vez: «vanguard europe».
+     `filtro.tipo` deja solo acciones, ETFs o fondos. */
+  function buscar(q, tope, filtro) {
+    const t = llano(q).trim().replace(/\s+/g, ' ');
+    if (!t) return [];
+    const trozos = t.split(' ');
     const yaTengo = new Set();
     try { Store.activos().forEach(a => yaTengo.add(llano(a.ticker))); } catch (e) {}
+    const tipo = filtro && filtro.tipo;
     const out = [];
     todos().forEach(x => {
+      if (tipo && x.tipo !== tipo) return;
       const tk = llano(x.ticker), nb = llano(x.nombre);
+      const palabras = nb.split(/[^a-z0-9&]+/).filter(Boolean);
+      const empiezaPalabra = w => palabras.some(p => p.startsWith(w));
       let p = -1;
       if (tk === t) p = 0;
       else if (tk.startsWith(t)) p = 1;
       else if (nb.startsWith(t)) p = 2;
-      else if (nb.includes(t)) p = 3;
-      else if (tk.includes(t)) p = 4;
+      else if (trozos.every(w => empiezaPalabra(w) || tk.startsWith(w))) p = 3;
+      else if (t.length >= 2 && tk.includes(t)) p = 4;
+      else if (t.length >= 3 && trozos.every(w => nb.includes(w) || tk.includes(w))) p = 5;
       if (p < 0) return;
       out.push(Object.assign({ p, tengo: yaTengo.has(tk) }, x));
     });
-    out.sort((a, b) => a.p - b.p || a.nombre.localeCompare(b.nombre));
-    return out.slice(0, tope || 8);
+    out.sort((a, b) => a.p - b.p || a.ticker.length - b.ticker.length || a.nombre.localeCompare(b.nombre));
+    const lista = out.slice(0, tope || 12);
+    lista.total = out.length;
+    return lista;
   }
 
-  return { V, buscar, todos, cuantos: () => todos().length };
+  /* Engancha el buscador a un campo cualquiera. La lista sale justo debajo
+     del campo, empujando lo de abajo (nada flotando que se corte en el
+     móvil), y se elige tocando. `opts.elegir(x)` recibe lo elegido;
+     `opts.filtro()` puede devolver { tipo } para afinar. */
+  function enganchar(input, opts) {
+    if (!input) return;
+    opts = opts || {};
+    const caja = document.createElement('div');
+    caja.className = 'sugerencias';
+    const campo = input.closest('.field') || input.parentNode;
+    campo.appendChild(caja);
+    let sug = [], marcado = -1;
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const nombreTipo = k => (typeof TIPOS !== 'undefined' && TIPOS[k]) || k;
+    const cerrar = () => { sug = []; marcado = -1; caja.innerHTML = ''; caja.classList.remove('on'); };
+    const pintar = () => {
+      if (!sug.length) {
+        const q = input.value.trim();
+        if (q.length >= 2 && opts.avisarVacio !== false) {
+          caja.innerHTML = `<div class="sug-nada">Nada en la lista con «${esc(q)}». Puedes añadirlo igual: escribe el resto a mano.</div>`;
+          caja.classList.add('on');
+        } else cerrar();
+        return;
+      }
+      caja.innerHTML = sug.map((x, i) => `
+        <button type="button" class="sug ${i === marcado ? 'on' : ''}" data-i="${i}">
+          <b>${esc(x.ticker)}</b>
+          <span>${esc(x.nombre)}<em>${esc(nombreTipo(x.tipo))}${x.mercado ? ' · ' + esc(x.mercado) : ''}${x.origen === 'cribado' ? ' · de tu cribado' : ''}</em></span>
+          ${x.tengo ? '<i class="ya">ya la tienes</i>' : ''}
+        </button>`).join('') +
+        (sug.total > sug.length ? `<div class="sug-nada">Y ${sug.total - sug.length} más: sigue escribiendo para afinar.</div>` : '');
+      caja.classList.add('on');
+      caja.querySelectorAll('.sug').forEach(b => b.onclick = e => { e.preventDefault(); elegir(sug[+b.dataset.i]); });
+    };
+    const elegir = x => {
+      if (!x) return;
+      cerrar();
+      if (opts.elegir) opts.elegir(x);
+    };
+    const buscarYa = () => {
+      sug = buscar(input.value, opts.tope || 12, opts.filtro ? opts.filtro() : null);
+      marcado = -1; pintar();
+    };
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('autocorrect', 'off');
+    input.setAttribute('autocapitalize', 'off');
+    input.setAttribute('spellcheck', 'false');
+    input.addEventListener('input', buscarYa);
+    input.addEventListener('focus', () => { if (input.value.trim() && !opts.noAlEnfocar) buscarYa(); });
+    input.addEventListener('keydown', e => {
+      if (!sug.length) return;
+      if (e.key === 'ArrowDown') { marcado = Math.min(sug.length - 1, marcado + 1); pintar(); e.preventDefault(); }
+      else if (e.key === 'ArrowUp') { marcado = Math.max(0, marcado - 1); pintar(); e.preventDefault(); }
+      else if (e.key === 'Enter') { elegir(sug[marcado < 0 ? 0 : marcado]); e.preventDefault(); }
+      else if (e.key === 'Escape') { cerrar(); e.stopPropagation(); }
+    });
+    /* Tocar fuera la cierra */
+    document.addEventListener('click', e => { if (!campo.contains(e.target)) cerrar(); });
+    return { cerrar, buscar: buscarYa };
+  }
+
+  /* El que encaja exacto con un ticker escrito a mano, para completar el
+     nombre si el usuario no llegó a elegir de la lista */
+  function exacto(tk) {
+    const t = llano(tk).trim();
+    return t ? todos().find(x => llano(x.ticker) === t) || null : null;
+  }
+
+  return { V, buscar, enganchar, exacto, todos, cuantos: () => todos().length };
 })();

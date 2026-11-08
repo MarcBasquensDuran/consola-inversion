@@ -318,3 +318,108 @@ LAS CARTERAS DE PAPEL
 
   NADA de esto toca lo real. Ni los totales de la cartera, ni el
   rendimiento, ni el informe fiscal. Son dos mundos separados.
+
+
+==============================================================
+MENOS PESTAÑAS: DE 13 A 9
+==============================================================
+
+  Semáforo · Cartera · Análisis · Seguimiento · Cribado ·
+  Operaciones · Fiscal · Método · Ajustes
+
+  ANÁLISIS = Panel + Rendimiento. Cuatro bloques: Resultado (tu
+  cartera contra el índice), De dónde sale, Composición (peso,
+  sector y tipo, con tus topes) y Valoración y salud.
+
+  SEGUIMIENTO = Seguimiento + Histórico. Novedades (con el encargo),
+  Indicadores (todas tus empresas frente a su historia y el detalle
+  de una) y Archivo (informes y tomas guardadas).
+
+  MÉTODO = Filosofía + Manual. Arriba «Mis reglas», que son las que
+  usa el semáforo; debajo el manual con su índice.
+
+  Arriba de cada una hay una barra con sus bloques: te lleva a cada
+  uno de un toque y en el móvil se queda pegada al bajar.
+
+  Se quitaron los gráficos repetidos. No se ha borrado ningún dato.
+
+
+CARTERA: REAL Y PAPEL
+
+  La cartera de papel ya no es una pestaña: es la mitad de Cartera.
+  Arriba eliges «Real | Papel». Al abrir la app siempre empieza en
+  Real.
+
+  Para que no se confundan nunca, el papel lleva:
+    · fondo ámbar con rayas y la marca de agua «SIMULACIÓN»
+    · un aviso que se queda pegado arriba y otro al final
+    · ventanas de comprar y vender en ámbar, con el título
+      «Papel ·» y el botón «Apuntar compra imaginaria»
+    · y la cabecera de arriba pone «Tu cartera real», porque sus
+      cifras siguen siendo las reales
+
+  En la vigilancia hay un botón «Probar en papel»: abre la compra
+  imaginaria con esa empresa y su precio ya puestos, y eliges en
+  qué estrategia.
+
+  La tabla que compara estrategias lleva dos filas grises: tu
+  cartera real y el índice. Un método que no gana al índice no
+  merece la pena, aunque gane a los demás.
+
+
+ESTRATEGIAS DE PAPEL EN ANÁLISIS
+
+  Encima de la curva de Resultado hay un botón por cada estrategia
+  de papel. Al encenderlas se dibujan sobre tu cartera y el índice
+  (discontinuas y en su color), aparece una tabla con lo que gana
+  cada una, al año y su peor caída, y en «De dónde sale» lo que
+  aporta cada valor de cada estrategia.
+
+  Por defecto todas parten de 100 el mismo día (el primero en que
+  existen todas): es la comparación justa. Puedes cambiar a «cada
+  una desde su principio» para ver la historia de cada una.
+
+  Para dibujar la curva hace falta el precio de cada valor en cada
+  fecha. Se usa el histórico de tus fichas si lo hay, el de cada
+  compra y venta de papel y cada precio que pongas a mano (ahora se
+  guarda con su fecha). Entre dos precios conocidos la línea va
+  recta y más tenue: es una estimación, y se afina sola con el
+  tiempo.
+
+
+ARREGLO EN EL MÓVIL
+
+  Cerca del principio de una pestaña, la cabecera se encogía y se
+  agrandaba sin parar y la pantalla temblaba. Arreglado.
+
+
+==============================================================
+GRÁFICOS LEGIBLES EN EL MÓVIL Y ESTRATEGIAS FRENTE A FRENTE
+==============================================================
+
+  Los gráficos se dibujaban a tamaño de ordenador y luego se
+  encogían: en el móvil la letra quedaba a 5 o 6 píxeles. Ahora se
+  dibujan al ancho real de la pantalla, con la letra entre 10,5 y
+  13 píxeles, y se vuelven a dibujar si giras el teléfono. En el
+  ordenador no cambia nada.
+
+  El gráfico de reparto (sector, tipo) salía en blanco cuando había
+  un solo grupo. Arreglado.
+
+  ESTRATEGIAS FRENTE A FRENTE (Análisis → Resultado). Aparece al
+  encender alguna estrategia de papel. Compara indicador a
+  indicador, cada uno solo para quien lo tiene con sentido:
+
+    Resultado (real, índice y papel, en el mismo periodo):
+      rentabilidad al año · peor caída · rentabilidad al año por
+      cada punto de caída
+    Cómo opera (real y papel; el índice no opera):
+      ventas con ganancia · operaciones al año · comisiones ·
+      días en cartera hasta vender
+    Qué tiene hoy (real y papel):
+      PER medio · rentabilidad por dividendo · posiciones ·
+      peso de la mayor · dinero sin invertir
+
+  La estrella marca la mejor en cada indicador que tiene un «mejor»
+  claro. Los que no lo tienen (operaciones al año, días en cartera)
+  se enseñan sin estrella.

@@ -5,7 +5,7 @@
    Es lo único que hay que tocar aquí: al cambiar, el móvil se entera
    de que hay versión nueva y te avisa para recargar.
    ═══════════════════════════════════════════════════════════════ */
-const VERSION = 'v8';
+const VERSION = 'v11';
 
 const CACHE = 'consola-' + VERSION;
 const ARCHIVOS = [
