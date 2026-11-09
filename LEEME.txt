@@ -531,3 +531,106 @@ CUADRAR CON EL EXTRACTO DE PATRIMONIO
 
   Lo más rápido para que todo cuadre: importar el historial completo
   de movimientos desde el primer día. Lo que ya esté no se duplica.
+
+
+==============================================================
+FECHA DEL PRECIO
+==============================================================
+
+  Debajo de cada precio, en Cartera y en vigilancia, sale de cuándo es:
+    gris    «hoy», «ayer», «hace 3 días»: al día
+    ámbar   ⏱ con la fecha: se va quedando viejo
+    rojo    ⚠ con la fecha, o «sin fecha»: no te fíes de él
+  Cuenta días de bolsa, no de calendario: el precio del viernes, el
+  lunes, sigue al día.
+
+  Y el semáforo avisa con una regla nueva, «El precio está sin
+  actualizar», porque todo lo que calcula (margen, objetivo, peso)
+  sale de ese precio. De serie salta a partir de 5 días de bolsa; se
+  cambia en Método → Mis reglas.
+
+
+==============================================================
+VERSIÓN 15 · PRECIOS SOLOS, VENTAS CON FECHA, ESTUDIOS DISCRETOS
+==============================================================
+
+  PRECIOS AUTOMÁTICOS (GOOGLE FINANCE)
+
+  La consola crea en tu carpeta de Drive una hoja de cálculo,
+  «Precios · Consola de inversión», escribe en ella una fórmula
+  GOOGLEFINANCE por valor, espera a que Google la calcule y se trae
+  el resultado. No hace falta que abras la hoja nunca.
+  · Al abrir la consola, después de sincronizar con Drive. Como
+    mucho una vez cada media hora.
+  · Retraso de hasta unos 20 minutos respecto a la bolsa. La fecha
+    que queda es la de la última cotización, no la de hoy.
+  · Acciones y ETF de las bolsas grandes, y criptomonedas.
+    Los fondos europeos NO están en Google Finance: siguen con el
+    extracto de Trade Republic o a mano.
+  · Pasa a euros solo: un valor de Nueva York en tu ficha en euros
+    llega en euros. Londres cotiza en peniques y también lo corrige.
+  · Si ese día pusiste tú un precio, no se pisa.
+  · Va guardando un precio por día en el histórico de cada valor.
+  · Si dos aparatos traen precios a la vez, se queda el más reciente
+    sin preguntarte: eso no es un conflicto de verdad.
+
+  Se enciende en Ajustes → Precios automáticos. Ahí ves también qué
+  valores no encuentra Google, con un botón a su ficha para
+  corregir el código.
+
+  >>> HAY QUE HACER UNA COSA EN GOOGLE, UNA SOLA VEZ (3 minutos) <<<
+
+  Igual que activaste la Drive API y la Calendar API:
+   1. Entra en console.cloud.google.com con tu correo personal.
+   2. Arriba a la izquierda, comprueba que está elegido el proyecto
+      de la consola (el mismo de las otras dos).
+   3. Menú ☰ → «APIs y servicios» → «Biblioteca».
+   4. Busca «Google Sheets API», ábrela y pulsa «Habilitar».
+   5. Vuelve a la consola: Ajustes → Precios automáticos → marca
+      «Traer los precios solos…».
+  No hace falta tocar config.js ni la pantalla de permisos: usa el
+  mismo permiso de Drive (solo los archivos que crea la app).
+  Si te salta «Falta activar la Google Sheets API», es este paso.
+
+  EL CÓDIGO DE BOLSA
+
+  Cada ficha tiene ahora una tarjeta «Identidad» con nombre, tipo,
+  ISIN, sector, país, bolsa y «Código de bolsa» (el de Google
+  Finance, por ejemplo BME:ITX, NASDAQ:MSFT, AMS:IWDA, LON:ULVR).
+  Si lo dejas vacío, se deduce de la bolsa y el ticker, que es lo
+  normal. Solo hace falta escribirlo si Google no lo encuentra.
+  Para comprobarlo: el botón Google Finance de los enlaces.
+
+  Desde «Identidad» también puedes cambiar el tipo. Tu letra del
+  Tesoro: ábrela, pon «Bono» y guarda. Desde entonces su resultado
+  cuenta como rendimiento del capital, no como ganancia patrimonial,
+  y su botón dice «Vencimiento».
+
+  VENDER CON FECHA (Y VENCIMIENTOS)
+
+  La ventana de vender tiene fecha. Para la letra comprada en 2024 y
+  vencida en 2025: pon la fecha del vencimiento, los títulos y lo
+  que te devolvieron por título (normalmente 1.000 €). Cuenta en el
+  ejercicio 2025, con los títulos que tenías ese día, y la regla de
+  los dos meses mira alrededor de esa fecha.
+
+  ESTUDIOS: SOLO LA EMPRESA
+
+  Al encargar un estudio, de serie solo se envía la empresa: nada de
+  títulos, importes, fechas ni pesos. En la misma ventana puedes
+  subirlo a «con el peso en la cartera» (porcentajes, sin euros) o
+  a «todo», si algún día te interesa. Se recuerda la elección.
+
+  ENLACES DE CADA VALOR
+
+  Botón ↗ en cada fila de Cartera y de vigilancia, y «Enlaces»
+  arriba de la ficha: Google Finance, Yahoo Finance, Investing,
+  MarketScreener, y según el valor CNMV, SEC (EE. UU.), Tesoro
+  Público, justETF y Morningstar (ETF y fondos), y la web de
+  inversores de la empresa si la pones en «Identidad». Se abren en
+  otra pestaña.
+
+  ARREGLADO DE PASO
+  · «Pegar de una lista» en Actualizar precios: «TAR;41,20» se leía
+    como 41. Ahora con punto y coma o tabulador la coma es decimal.
+  · Cambiar el precio en la ficha pone su fecha a hoy.

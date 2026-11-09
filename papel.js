@@ -57,7 +57,7 @@ const Papel = (() => {
   function precio(tk) {
     tk = String(tk || '').toUpperCase();
     const p = raiz().precios[tk];
-    if (p && Number(p.precio)) return { precio: Number(p.precio), fecha: p.fecha || '', de: 'a mano' };
+    if (p && Number(p.precio)) return { precio: Number(p.precio), fecha: p.fecha || '', de: p.fuente || 'a mano' };
     const a = Store.activos().find(x => (x.ticker || '').toUpperCase() === tk);
     if (a && Number(a.cotizacion.precio)) return { precio: Number(a.cotizacion.precio), fecha: a.cotizacion.fecha, de: 'tu ficha' };
     try {

@@ -98,7 +98,7 @@ const Nube = (() => {
      con el número suelto, un 403 puede ser cinco cosas distintas y no hay por
      dónde cogerlo, así que leemos el motivo y lo contamos en castellano. */
   function api(url, opts) {
-    const servicio = /googleapis\.com\/calendar/.test(url) ? 'Calendar' : 'Drive';
+    const servicio = /googleapis\.com\/calendar/.test(url) ? 'Calendar' : /sheets\.googleapis\.com/.test(url) ? 'Sheets' : 'Drive';
     return fetch(url, Object.assign({}, opts, {
       headers: Object.assign({ Authorization: 'Bearer ' + token }, (opts || {}).headers || {})
     })).then(r => {
@@ -117,7 +117,7 @@ const Nube = (() => {
 
   /* Las tres que de verdad pasan, dichas de manera que se puedan arreglar */
   function explicar(estado, razon, dice, servicio) {
-    const api = servicio === 'Calendar' ? 'Google Calendar API' : 'Google Drive API';
+    const api = { Calendar: 'Google Calendar API', Sheets: 'Google Sheets API' }[servicio] || 'Google Drive API';
     if (estado === 403 && (razon === 'accessNotConfigured' || /SERVICE_DISABLED|has not been used in project|is disabled/i.test(dice)))
       return `Falta activar la ${api} en tu proyecto de Google. ` +
              `Entra en console.cloud.google.com, busca «${api}» en la Biblioteca de APIs, ` +
@@ -325,6 +325,8 @@ const Nube = (() => {
       sincronizando = false;
       if (res.estado !== 'al-dia' && res.estado !== 'ocupado') Vistas.refrescar();
       else refrescarIndicador();
+      /* Con Drive ya al día y la sesión abierta, toca mirar los precios */
+      if (res.estado !== 'necesita-decision' && typeof Precios !== 'undefined') setTimeout(() => Precios.trasSincronizar(), 400);
       return res;
     }).catch(e => {
       sincronizando = false;

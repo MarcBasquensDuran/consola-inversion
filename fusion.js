@@ -42,6 +42,7 @@ const Fusion = (() => {
      la unión por id es segura y no hay conflictos posibles dentro de ellas.
      Las operaciones están aquí a propósito: una operación duplicada o
      fusionada campo a campo descuadraría el FIFO y el informe fiscal. */
+  const SIN_AVISO = new Set(['cotizacion', 'serie', 'fx', 'precios']);
   const SOLO_AÑADIR = new Set([
     'operaciones', 'noticias', 'revisiones', 'informes', 'estudios',
     'serie', 'historial', 'datos', 'intereses'
@@ -100,6 +101,20 @@ const Fusion = (() => {
     if (Array.isArray(local) || Array.isArray(remoto))
       return fusionarLista(base, local, remoto, nombre, ctx);
 
+    /* La cotización de una ficha: precio y fecha van juntos, del día más reciente */
+    if (nombre === 'cotizacion' && esObj(local) && esObj(remoto) && (local.fecha || remoto.fecha) && local.fecha !== remoto.fecha) {
+      const nueva = (local.fecha || '') > (remoto.fecha || '') ? local : remoto, vieja = nueva === local ? remoto : local;
+      const salida = Object.assign({}, vieja, nueva);
+      /* lo demás (PER, máximos…) se junta como siempre */
+      Object.keys(salida).forEach(k => {
+        if (k === 'precio' || k === 'fecha') return;
+        ctx.ruta.push(k);
+        salida[k] = fusionarValor(base ? base[k] : undefined, local[k], remoto[k], k, ctx);
+        ctx.ruta.pop();
+      });
+      return salida;
+    }
+
     if (esObj(local) && esObj(remoto)) {
       const salida = {};
       const claves = new Set([...Object.keys(base || {}), ...Object.keys(local), ...Object.keys(remoto)]);
@@ -117,6 +132,11 @@ const Fusion = (() => {
       });
       return salida;
     }
+
+    /* Precios: los dos aparatos los traen solos y casi nunca coinciden al
+       céntimo. Eso no es un conflicto que debas resolver tú: gana el más
+       reciente y no se avisa. */
+    if (ctx.ruta.some(k => SIN_AVISO.has(k))) return ctx.ganaLocal ? local : remoto;
 
     /* Un valor suelto cambiado en los dos sitios: conflicto de verdad */
     ctx.conflictos.push({

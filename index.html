@@ -573,6 +573,8 @@ tr.fila-papel td{background:var(--papel-tarjeta)}
 
 /* Importar del bróker */
 .imp-resumen{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.priv-sel{margin:0 0 12px}
+.priv-sel select{width:100%}
 .imp-n{display:flex;align-items:baseline;gap:10px;padding:8px 12px;border-radius:var(--r);background:var(--c-surface-2);font-size:13.5px}
 .imp-n b{font-size:18px;font-variant-numeric:tabular-nums;min-width:28px;text-align:right}
 .imp-n.si{background:var(--v-mantener-bg);color:var(--v-mantener)}
@@ -598,6 +600,24 @@ tr.fila-papel td{background:var(--papel-tarjeta)}
 .imp-fichas input.imp-tk{width:100px;font-variant-numeric:tabular-nums;text-transform:uppercase}
 .imp-fichas td small{display:block;font-size:11px;margin-top:3px}
 .imp-fichas select{min-width:96px}
+
+
+/* Fecha del precio: neutra si está al día, ámbar si se va quedando viejo,
+   roja si ya no es fiable. Lleva texto, no solo color */
+.frescura{display:block;font-size:11px;margin-top:3px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.frescura.fresco{color:var(--c-muted)}
+.frescura.viejo{color:var(--v-reducir);font-weight:600}
+.frescura.viejo::before{content:'⏱ '}
+.frescura.muy-viejo{color:var(--v-vender);font-weight:700}
+.frescura.muy-viejo::before{content:'⚠ '}
+
+
+/* Enlaces de cada valor */
+.enlaces{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.enl-g{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.enl-g > span{font-size:11.5px;color:var(--c-muted);min-width:118px;font-weight:600}
+.enl-g a.btn{text-decoration:none}
+@media (max-width:760px){ .enl-g > span{min-width:100%} .enl-g a.btn{padding:8px 12px} }
 
 /* Buscador del catálogo de valores. La lista va DENTRO del flujo, debajo
    del campo: flotando se cortaba contra el borde del formulario en el móvil */
@@ -1349,6 +1369,12 @@ details summary{cursor:pointer;font-size:13px;color:var(--c-ink-soft);padding:4p
     </div>
 
     <div class="card">
+      <div class="card-h"><h3>Precios automáticos</h3>
+        <div class="sub">Google Finance, sin que tengas que hacer nada</div></div>
+      <div class="card-b" id="pr-cuerpo"></div>
+    </div>
+
+    <div class="card">
       <div class="card-h"><h3>Avisos en el calendario</h3>
         <div class="sub">Para que las fechas te busquen a ti</div></div>
       <div class="card-b" id="ag-cuerpo"></div>
@@ -1480,7 +1506,27 @@ const Util = (() => {
       const r = new FileReader(); r.onload = () => cb(r.result, f.name); r.readAsText(f, 'utf-8'); };
     inp.click();
   }
-  return { $, $$, uid, hoy, n, eur, num, pct, signo, fecha, dias, esc, bytes, toast, bajar, leerArchivo };
+  /* Días de mercado entre dos fechas: un precio del viernes, el lunes, es de
+     hace un día de bolsa, no de tres */
+  function diasHabiles(a, b) {
+    if (!a) return Infinity;
+    const d0 = new Date(a + 'T12:00:00'), d1 = new Date((b || hoy()) + 'T12:00:00');
+    if (isNaN(d0) || d1 <= d0) return 0;
+    let n2 = 0; const d = new Date(d0);
+    while (d < d1) { d.setDate(d.getDate() + 1); const w = d.getDay(); if (w !== 0 && w !== 6) n2++; }
+    return n2;
+  }
+  /* Lo fresco que está un precio, con el umbral de la regla del semáforo */
+  function frescura(fechaPrecio) {
+    let u = 5;
+    try { u = Motor.config('precio_viejo').umbral || 5; } catch (e) {}
+    if (!fechaPrecio) return { dias: Infinity, clase: 'muy-viejo', texto: 'sin fecha', titulo: 'No sé de cuándo es este precio' };
+    const d = diasHabiles(fechaPrecio), nat = dias(fechaPrecio, hoy());
+    const texto = nat <= 0 ? 'hoy' : nat === 1 ? 'ayer' : nat < 7 ? `hace ${nat} días` : fecha(fechaPrecio);
+    return { dias: d, clase: d <= u ? 'fresco' : d <= u * 3 ? 'viejo' : 'muy-viejo', texto,
+      titulo: `Precio del ${fecha(fechaPrecio)}: ${d} ${d === 1 ? 'día' : 'días'} de bolsa${d > u ? ` (más de ${u}: conviene actualizarlo)` : ''}` };
+  }
+  return { $, $$, uid, hoy, n, eur, num, pct, signo, fecha, dias, diasHabiles, frescura, esc, bytes, toast, bajar, leerArchivo };
 })();
 const { $, $$ } = Util;
 
@@ -2832,8 +2878,9 @@ const Calc = (() => {
 
   /* Lotes vivos en orden de entrada. En España el criterio fiscal es FIFO:
      al vender se consumen los títulos más antiguos, que suelen ser los más baratos. */
-  function lotes(activoId) {
-    const ops = Store.ops().filter(o => o.activoId === activoId)
+  /* Con `hasta`, los lotes que había ese día: para simular una venta pasada */
+  function lotes(activoId, hasta) {
+    const ops = Store.ops().filter(o => o.activoId === activoId && (!hasta || (o.fecha || '') <= hasta))
       .slice().sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
     let lot = [];
     ops.forEach(o => {
@@ -2864,10 +2911,16 @@ const Calc = (() => {
     return cuota;
   }
 
-  function simularVenta(activoId, titulos, precio, comision) {
+  function simularVenta(activoId, titulos, precio, comision, fecha) {
     const a = Store.activo(activoId);
-    const p = posicion(activoId);
-    const lot = lotes(activoId);
+    fecha = fecha || Util.hoy();
+    const pasada = fecha < Util.hoy();
+    const p0 = posicion(activoId);
+    const lot = lotes(activoId, fecha);
+    /* Lo que tenías ese día, no hoy */
+    const titEn = lot.reduce((s2, l) => s2 + l.titulos, 0);
+    const costeEn = lot.reduce((s2, l) => s2 + l.titulos * l.precio + l.comision, 0);
+    const p = pasada ? Object.assign({}, p0, { titulos: titEn, coste: costeEn }) : p0;
     let quedan = titulos, coste = 0;
     const consumidos = [], sobran = [];
     lot.forEach(l => {
@@ -2903,18 +2956,24 @@ const Calc = (() => {
       /* Compras de los dos últimos meses que, tras esta venta, SEGUIRÍAN en cartera:
          son las que aparcan la pérdida. Si la venta cierra la posición entera, la
          compra que la creó no bloquea nada, porque no te queda el valor en la mano. */
-      comprasRecientes: (() => {
-        const ini = new Date(); ini.setMonth(ini.getMonth() - 2);
-        const desde = ini.toISOString().slice(0, 10);
-        return Store.ops().filter(o => o.activoId === activoId && o.tipo === 'compra' &&
-          o.fecha >= desde && sobran.some(s => s.fecha === o.fecha));
+      /* La regla de los dos meses alrededor de la FECHA DE LA VENTA. Para una
+         venta pasada se conocen también las recompras de después */
+      ...(() => {
+        const ini = new Date(fecha + 'T12:00:00'); ini.setMonth(ini.getMonth() - 2);
+        const fin = new Date(fecha + 'T12:00:00'); fin.setMonth(fin.getMonth() + 2);
+        const desde = ini.toISOString().slice(0, 10), hasta = fin.toISOString().slice(0, 10);
+        const antes = Store.ops().filter(o => o.activoId === activoId && o.tipo === 'compra' &&
+          o.fecha >= desde && o.fecha <= fecha && sobran.some(s2 => s2.fecha === o.fecha));
+        const despues = Store.ops().filter(o => o.activoId === activoId && o.tipo === 'compra' && o.fecha > fecha && o.fecha <= hasta);
+        return {
+          comprasRecientes: [...antes, ...despues],
+          titulosAparcados: sobran.filter(s2 => s2.fecha >= desde).reduce((s2, x) => s2 + x.titulos, 0)
+            + despues.reduce((s2, o) => s2 + o.titulos, 0)
+        };
       })(),
-      titulosAparcados: sobran.filter(s => {
-        const ini = new Date(); ini.setMonth(ini.getMonth() - 2);
-        return s.fecha >= ini.toISOString().slice(0, 10);
-      }).reduce((s, x) => s + x.titulos, 0),
-      pesoAntes: c.pesoDe(activoId),
-      pesoDespues: carteraDespues > 0 ? valorDespues / carteraDespues * 100 : 0,
+      fecha, pasada, esBono: a.tipo === 'bono',
+      pesoAntes: pasada ? null : c.pesoDe(activoId),
+      pesoDespues: pasada ? null : (carteraDespues > 0 ? valorDespues / carteraDespues * 100 : 0),
       recompra: ganancia < 0
     };
   }
@@ -3004,10 +3063,16 @@ const Calc = (() => {
       bolsa = bolsa.filter(b => b.caduca >= y);
 
       const ventas = todas.filter(v => v.ano === a);
+      /* Bonos y letras: lo que se gana o pierde al venderlos o al vencer es
+         rendimiento del capital mobiliario, como los intereses, y no ganancia
+         patrimonial como en las acciones. Van aparte. */
+      const esBono = v => (Store.activo(v.activoId) || {}).tipo === 'bono';
+      const ventasGP = ventas.filter(v => !esBono(v)), ventasBono = ventas.filter(esBono);
+      const bonosRes = ventasBono.reduce((s, v) => s + v.resultado, 0);
       /* Una ganancia nunca se bloquea; de una pérdida puede computar solo una parte */
-      const ganancias = ventas.filter(v => v.resultado > 0).reduce((s, v) => s + v.resultado, 0);
-      const perdidas = ventas.filter(v => v.resultado < 0).reduce((s, v) => s + v.computable, 0);
-      const bloqueadas = ventas.reduce((s, v) => s + (v.resultadoBloqueado || 0), 0);
+      const ganancias = ventasGP.filter(v => v.resultado > 0).reduce((s, v) => s + v.resultado, 0);
+      const perdidas = ventasGP.filter(v => v.resultado < 0).reduce((s, v) => s + v.computable, 0);
+      const bloqueadas = ventasGP.reduce((s, v) => s + (v.resultadoBloqueado || 0), 0);
       const saldoGP = ganancias + perdidas;
 
       const divs = Store.ops().filter(o => o.tipo === 'dividendo' && (o.fecha || '').slice(0, 4) === a);
@@ -3018,7 +3083,7 @@ const Calc = (() => {
       const ints = (Store.get().intereses || []).filter(i => (i.fecha || '').slice(0, 4) === a);
       const intBruto = ints.reduce((s, i) => s + Util.n(i.importe), 0);
       const intRet = ints.reduce((s, i) => s + Util.n(i.retencion), 0);
-      const rcmBruto = divBruto + intBruto;
+      const rcmBruto = divBruto + intBruto + bonosRes;
 
       let baseGP = 0, usadoBolsa = 0, compensadoRCM = 0, aBolsa = 0;
       if (saldoGP > 0) {
@@ -3036,7 +3101,7 @@ const Calc = (() => {
 
       /* Hasta un 25 % de los dividendos puede absorber pérdidas: primero las del
          año, y si quedan dividendos por compensar, las que vengan arrastradas */
-      let margen = rcmBruto * 0.25;
+      let margen = Math.max(0, rcmBruto) * 0.25;
       if (aBolsa > 0 && margen > 0) {
         const usa = Math.min(aBolsa, margen);
         aBolsa -= usa; compensadoRCM += usa; margen -= usa;
@@ -3051,14 +3116,22 @@ const Calc = (() => {
       if (aBolsa > 0) bolsa.push({ ano: a, restante: aBolsa, caduca: y + 4 });
       bolsa = bolsa.filter(b => b.restante > 0.005);
 
-      const baseRCM = rcmBruto - compensadoRCM;
+      /* Al revés: si los rendimientos del capital salen negativos (un bono
+         vendido con pérdida), absorben hasta un 25 % de las ganancias */
+      let rcmNegUsado = 0, rcmNegPendiente = 0;
+      if (rcmBruto < 0) {
+        rcmNegUsado = Math.min(-rcmBruto, baseGP * 0.25);
+        baseGP -= rcmNegUsado;
+        rcmNegPendiente = -rcmBruto - rcmNegUsado;
+      }
+      const baseRCM = Math.max(0, rcmBruto) - compensadoRCM;
       const base = baseGP + baseRCM;
       const cuota = impuestoAhorro(base);
 
       if (a === objetivo) {
         res = {
           ano: a, ventas, ganancias, perdidas, bloqueadas, saldoGP,
-          divBruto, divRet, divs, intBruto, intRet, ints, rcmBruto,
+          divBruto, divRet, divs, intBruto, intRet, ints, rcmBruto, ventasBono, bonosRes, rcmNegUsado, rcmNegPendiente,
           usadoBolsa, compensadoRCM, aBolsa,
           caducadas: caducadas.filter(c => c.restante > 0.005),
           pendientes: bolsa.map(b => ({ ano: b.ano, importe: -b.restante, caduca: b.caduca, restan: b.caduca - y, manual: !!b.manual })),
@@ -3598,6 +3671,20 @@ const CATALOGO = [
       if (!e || !e.veredicto || e.veredicto === 'mantener') return null;
       if (e.leido && e.resuelto) return null;
       return { texto: `El estudio del ${Util.fecha(e.fecha)} propone ${ACCIONES[e.veredicto].toLowerCase()}: ${e.titular}` };
+    }
+  },
+  {
+    id: 'precio_viejo', nombre: 'El precio está sin actualizar',
+    desc: 'Días de bolsa desde el último precio. Todo lo que calcula el semáforo (margen, objetivo, peso, latente) sale de ese precio: si es viejo, la señal también.',
+    tipos: ['accion', 'etf', 'fondo', 'cripto', 'reit', 'bono'], severidad: 'media', accion: 'revisar', umbral: 5, unidad: 'días de bolsa',
+    evaluar: ({ a, u }) => {
+      if (a.estado !== 'cartera' && a.estado !== 'vigilancia') return null;
+      if (!Util.n(a.cotizacion.precio)) return { texto: 'No tiene precio: no puedo calcular nada con él.' };
+      const d = Util.diasHabiles(a.cotizacion.fecha);
+      if (d <= u) return null;
+      return { texto: a.cotizacion.fecha
+        ? `El último precio es del ${Util.fecha(a.cotizacion.fecha)}, hace ${d} días de bolsa. Las demás señales de este valor pueden estar desfasadas.`
+        : 'El precio no tiene fecha: no sé si está al día.' };
     }
   },
   {
@@ -4381,15 +4468,17 @@ const Vistas = (() => {
             <td><span class="pill tipo t-${a.tipo}">${TIPOS[a.tipo]}</span></td>
             <td class="r num">${Util.num(p.titulos, p.titulos < 10 ? 4 : 0)}</td>
             <td class="r num">${Util.num(p.costeMedio)}</td>
-            <td class="r"><input type="number" step="any" class="num" style="width:90px;text-align:right"
-                 value="${Util.n(a.cotizacion.precio)}" data-precio="${a.id}"></td>
+            <td class="r">${(() => { const fr = Util.frescura(a.cotizacion.fecha); return `<input type="number" step="any" class="num" style="width:90px;text-align:right"
+                 value="${Util.n(a.cotizacion.precio)}" data-precio="${a.id}">
+                 <small class="frescura ${fr.clase}" title="${Util.esc(fr.titulo)}">${fr.texto}</small>`; })()}</td>
             <td class="r num">${Util.eur(p.valor, 0)}</td>
             <td class="r num">${Util.num(f.peso)} %</td>
             <td class="r num ${p.latente >= 0 ? 'pos' : 'neg'}">${Util.signo(p.latentePct)} %</td>
             <td class="r num">${m === null ? '—' : Util.signo(m, 0) + ' %'}</td>
             <td><span class="pill ${v.accion}">${ACCIONES[v.accion]}</span></td>
             <td class="no-print nowrap"><button class="btn mini" data-ficha2="${a.id}">Ficha</button>
-              <button class="btn mini" data-sim2="${a.id}">Vender</button></td>
+              <button class="btn mini" data-sim2="${a.id}">${a.tipo === 'bono' ? 'Vencimiento' : 'Vender'}</button>
+              <button class="btn mini" data-enl="${a.id}" title="Cotización, noticias y documentos de ${Util.esc(a.ticker)}">↗</button></td>
           </tr>`;
         }).join('')}</tbody>
         <tfoot><tr>
@@ -4525,7 +4614,8 @@ const Vistas = (() => {
               <button class="btn mini" data-vmenos="${a.id}" title="Menos">−</button>
               <input type="number" min="0" max="10" step="1" value="${Util.n(a.interes)}" data-vint="${a.id}">
               <button class="btn mini" data-vmas="${a.id}" title="Más">+</button></div></td>
-            <td class="r num">${Util.num(a.cotizacion.precio)}</td>
+            <td class="r num">${Util.num(a.cotizacion.precio)}${(() => { const fr = Util.frescura(a.cotizacion.fecha);
+              return Util.n(a.cotizacion.precio) ? `<small class="frescura ${fr.clase}" title="${Util.esc(fr.titulo)}">${fr.texto}</small>` : ''; })()}</td>
             <td class="r num">${Util.num(a.valoracion.base.precio)}</td>
             <td class="r num ${m !== null && m > 0 ? 'pos' : ''}">${m === null ? '—' : Util.signo(m, 0) + ' %'}</td>
             ${porNota ? `<td class="r num" title="${Util.esc(sel.map(f => `${f.nombre}: ${Util.num(d.ev[f.id].score, 0)}`).join(' · '))}">
@@ -4534,7 +4624,8 @@ const Vistas = (() => {
             <td class="no-print nowrap"><button class="btn mini" data-ficha2="${a.id}">Ficha</button>
               <button class="btn mini" data-comprar="${a.id}">Comprar</button>
               <button class="btn mini btn-papel" data-probar="${a.id}" title="Comprarla con dinero imaginario en una cartera de papel">Probar en papel</button>
-              <button class="btn mini" data-quitarvig="${a.id}">Quitar</button></td>
+              <button class="btn mini" data-quitarvig="${a.id}">Quitar</button>
+              <button class="btn mini" data-enl="${a.id}" title="Cotización, noticias y documentos de ${Util.esc(a.ticker)}">↗</button></td>
           </tr>`;
         }).join('') : `<tr><td colspan="${col + 1}" class="vacio"><b>Nada en vigilancia todavía</b>Añade un activo y déjalo «en vigilancia», o pásalo desde el cribado.</td></tr>`}</tbody>`;
 
@@ -4594,6 +4685,7 @@ const Vistas = (() => {
       });
       $$('[data-ficha2]').forEach(b => b.onclick = () => Ficha.abrir(b.dataset.ficha2));
       $$('[data-sim2]').forEach(b => b.onclick = () => Sim.abrir(b.dataset.sim2));
+      $$('[data-enl]').forEach(b => b.onclick = () => Enlaces.ventana(b.dataset.enl));
       $$('[data-comprar]').forEach(b => b.onclick = () => Ops.nueva(b.dataset.comprar, 'compra'));
       $$('[data-huerfano]').forEach(b => b.onclick = () => Ops.nueva(b.dataset.huerfano, 'compra'));
       $$('[data-cuadrar]').forEach(b => b.onclick = () => {
@@ -5691,7 +5783,7 @@ const Vistas = (() => {
       const porCaducar = f.pendientes.filter(p => p.restan <= 1);
       if (porCaducar.length) avisos.push({ c: 'alta', t: 'Minusvalías a punto de caducar',
         p: `${porCaducar.map(p => `${Util.eur(Math.abs(p.importe), 0)} de ${p.ano} caducan en ${p.caduca}`).join(', ')}. Si tienes plusvalías latentes, este es el año de aflorarlas.` });
-      if (f.ventas.some(v => v.bloqueada)) avisos.push({ c: 'alta', t: 'Pérdidas aparcadas por la regla de los dos meses',
+      if (Math.abs(f.bloqueadas) > 0.005) avisos.push({ c: 'alta', t: 'Pérdidas aparcadas por la regla de los dos meses',
         p: `${Util.eur(Math.abs(f.bloqueadas), 0)} en pérdidas que no computan este año: te quedaste títulos del mismo valor comprados dentro de los dos meses. Vuelven cuando vendas esos títulos, y entonces hay que meterlas a mano.` });
       $('#fs-avisos').innerHTML = avisos.length
         ? `<ul class="motivos" style="margin-bottom:16px">${avisos.map(a =>
@@ -5709,11 +5801,14 @@ const Vistas = (() => {
           ${fila('Saldo de ganancias y pérdidas', f.saldoGP, { fuerte: true })}
           ${f.usadoBolsa ? fila('Compensado con pérdidas de años anteriores', -f.usadoBolsa, { sangria: true, clase: 'pos' }) : ''}
           ${f.aBolsa ? fila('Pérdida que se guarda para los próximos cuatro años', -f.aBolsa, { sangria: true }) : ''}
+          ${f.rcmNegUsado ? fila('Pérdida de bonos absorbida por ganancias (tope del 25 %)', -f.rcmNegUsado, { sangria: true, clase: 'pos' }) : ''}
           ${fila('Base por ganancias patrimoniales', f.baseGP, { fuerte: true })}
           ${fila('Dividendos brutos', f.divBruto, {})}
           ${f.intBruto ? fila('Intereses de cuentas, brutos', f.intBruto, {}) : ''}
-          ${f.compensadoRCM ? fila(`Pérdidas absorbidas por ${f.intBruto ? 'dividendos e intereses' : 'dividendos'} (tope del 25 %)`, -f.compensadoRCM, { sangria: true, clase: 'pos' }) : ''}
-          ${fila(f.intBruto ? 'Base por dividendos e intereses' : 'Base por dividendos', f.baseRCM, { fuerte: true })}
+          ${f.ventasBono.length ? fila('Bonos y letras: lo ganado al vender o al vencer', f.bonosRes, { clase: f.bonosRes >= 0 ? 'pos' : 'neg' }) : ''}
+          ${f.compensadoRCM ? fila(`Pérdidas absorbidas por rendimientos del capital (tope del 25 %)`, -f.compensadoRCM, { sangria: true, clase: 'pos' }) : ''}
+          ${fila(f.intBruto || f.ventasBono.length ? 'Base por rendimientos del capital (dividendos, intereses, bonos)' : 'Base por dividendos', f.baseRCM, { fuerte: true })}
+          ${f.rcmNegPendiente ? `<tr><td colspan="2" class="small neg">Quedan ${Util.eur(f.rcmNegPendiente, 2)} de rendimientos del capital negativos por compensar en los cuatro años siguientes. La consola no los arrastra: apúntalos para la declaración.</td></tr>` : ''}
           ${fila('Base del ahorro', f.base, { fuerte: true })}
           ${fila('Cuota estimada', f.cuota, { fuerte: true })}
           ${fila('Retenciones ya practicadas', -f.retenido, { clase: 'pos' })}
@@ -5738,7 +5833,8 @@ const Vistas = (() => {
           const a = Store.activo(v.activoId);
           return `<tr>
             <td class="nowrap">${Util.fecha(v.fecha)}</td>
-            <td class="tick">${a ? Util.esc(a.ticker) : '—'}${v.bloqueada ? `<small class="neg">${v.parcial ? `aparcada al ${Util.num(v.parteBloqueada * 100, 0)} %` : 'aparcada'}</small>` : ''}</td>
+            <td class="tick">${a ? Util.esc(a.ticker) : '—'}${a && a.tipo === 'bono' ? '<small>bono · rendimiento del capital, no ganancia patrimonial</small>'
+              : v.bloqueada ? `<small class="neg">${v.parcial ? `aparcada al ${Util.num(v.parteBloqueada * 100, 0)} %` : 'aparcada'}</small>` : ''}</td>
             <td class="r num">${Util.num(v.titulos, v.titulos < 10 ? 4 : 0)}</td>
             <td class="r num">${Util.eur(v.importe, 0)}</td>
             <td class="r num">${Util.eur(v.coste, 0)}</td>
@@ -5814,6 +5910,7 @@ const Vistas = (() => {
       if (typeof Pantalla !== 'undefined') Pantalla.selector();
       if (typeof Nube !== 'undefined') { Nube.pintarAjustes(); Nube.refrescarIndicador(); }
       if (typeof Agenda !== 'undefined') Agenda.pintarAjustes();
+      if (typeof Precios !== 'undefined') Precios.pintarAjustes();
       $('#uso-bytes').textContent = Util.bytes(e.datos + e.copias);
       const cs = Store.copias();
       $('#uso-copia').textContent = cs.length ? new Date(cs[0].ts).toLocaleString('es-ES') : '—';
@@ -6541,8 +6638,83 @@ const Vistas = (() => {
 <script src="./estudio.js"></script>
 <script src="./papel.js"></script>
 <script src="./brokers.js"></script>
+<script src="./precios.js"></script>
 <script>
 /* ═══════════════ FICHA DEL ACTIVO ═══════════════ */
+/* ═══════════════ CÓDIGOS DE BOLSA Y ENLACES ═══════════════
+   Un mismo dato, el código de bolsa («BME:ITX»), sirve para el precio
+   automático y para abrir cada web ya buscando ese valor. */
+const Enlaces = (() => {
+  /* Bolsa → prefijo de Google Finance y sufijo de Yahoo */
+  const BOLSAS = {
+    'Madrid': ['BME', '.MC'], 'Lisboa': ['ELI', '.LS'], 'París': ['EPA', '.PA'],
+    'Fráncfort': ['ETR', '.DE'], 'Xetra': ['ETR', '.DE'], 'Ámsterdam': ['AMS', '.AS'],
+    'Bruselas': ['EBR', '.BR'], 'Milán': ['BIT', '.MI'], 'Zúrich': ['SWX', '.SW'],
+    'Estocolmo': ['STO', '.ST'], 'Copenhague': ['CPH', '.CO'], 'Oslo': ['OSL', '.OL'],
+    'Helsinki': ['HEL', '.HE'], 'Londres': ['LON', '.L'], 'NYSE': ['NYSE', ''], 'Nasdaq': ['NASDAQ', '']
+  };
+  const DE_GOOGLE = Object.fromEntries(Object.values(BOLSAS).map(([g, y]) => [g, y]));
+  /* Otros nombres con que puede venir la bolsa (de un CSV, del cribado…) */
+  const ALIAS = { BME: 'Madrid', MCE: 'Madrid', 'BOLSA DE MADRID': 'Madrid', NASDAQ: 'Nasdaq', NYSE: 'NYSE', XETRA: 'Xetra',
+    LSE: 'Londres', LONDON: 'Londres', PARIS: 'París', AMSTERDAM: 'Ámsterdam', MILAN: 'Milán', LISBON: 'Lisboa', FRANKFURT: 'Fráncfort' };
+  const bolsaNombre = m => { m = String(m || '').trim(); return BOLSAS[m] ? m : (ALIAS[Util.llano ? Util.llano(m).toUpperCase() : m.toUpperCase()] || ALIAS[m.toUpperCase()] || m); };
+  const bolsaDe = a => bolsaNombre(a.mercado || (typeof VALORES !== 'undefined' && VALORES.exacto(a.ticker) || {}).mercado || '');
+  /* «BME:ITX»: el que hayas escrito en la ficha o el que se deduce de la bolsa */
+  function codigo(a) {
+    if (a.cotizar) return String(a.cotizar).trim().toUpperCase();
+    /* Criptomonedas: Google las da como un cambio de divisa, BTC a euros */
+    if (a.tipo === 'cripto' && /^[A-Z0-9]{2,6}$/i.test(a.ticker || '')) return `CURRENCY:${String(a.ticker).toUpperCase()}EUR`;
+    const b = BOLSAS[bolsaDe(a)];
+    return b && a.ticker ? `${b[0]}:${String(a.ticker).toUpperCase()}` : '';
+  }
+  function yahoo(a) {
+    const c = codigo(a); if (!c) return '';
+    const [bolsa, tk] = c.split(':');
+    if (bolsa === 'CURRENCY') return tk.slice(0, -3) + '-' + tk.slice(-3);
+    if (!tk || !(bolsa in DE_GOOGLE)) return '';
+    return tk.replace(/\./g, '-') + DE_GOOGLE[bolsa];
+  }
+  const q = encodeURIComponent;
+  const enWeb = (sitio, texto) => `https://www.google.com/search?q=${q('site:' + sitio + ' ' + texto)}`;
+  /* La lista de enlaces que tienen sentido para ESTE valor */
+  function de(a) {
+    const c = codigo(a), isin = (a.isin || '').toUpperCase(), tk = String(a.ticker || '').toUpperCase();
+    const busca = isin || `${a.nombre || ''} ${tk}`.trim();
+    const L = [];
+    if (c) {
+      const [bolsa, t] = c.split(':');
+      L.push({ g: 'Cotización', n: 'Google Finance', u: bolsa === 'CURRENCY'
+        ? `https://www.google.com/finance/quote/${q(t.slice(0, -3) + '-' + t.slice(-3))}`
+        : `https://www.google.com/finance/quote/${q(t)}:${q(bolsa)}` });
+    }
+    const y = yahoo(a);
+    if (y) L.push({ g: 'Cotización', n: 'Yahoo Finance', u: `https://finance.yahoo.com/quote/${q(y)}` });
+    L.push({ g: 'Datos y noticias', n: 'Investing', u: `https://es.investing.com/search/?q=${q(busca)}` });
+    L.push({ g: 'Datos y noticias', n: 'MarketScreener', u: `https://es.marketscreener.com/buscar/?q=${q(busca)}` });
+    if (a.tipo === 'bono' && isin.startsWith('ES')) L.push({ g: 'Oficial', n: 'Tesoro Público', u: enWeb('tesoro.es', isin) });
+    if (isin.startsWith('ES') && a.tipo !== 'fondo' && a.tipo !== 'bono') L.push({ g: 'Oficial', n: 'CNMV', u: enWeb('cnmv.es', isin || a.nombre) });
+    if (isin.startsWith('US') || (c && /^(NYSE|NASDAQ):/.test(c)))
+      L.push({ g: 'Oficial', n: 'SEC EDGAR', u: `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${q(tk.replace(/\./g, '-'))}&type=10-K` });
+    if (a.tipo === 'etf' && isin) L.push({ g: 'ETFs y fondos', n: 'justETF', u: `https://www.justetf.com/es/etf-profile.html?isin=${q(isin)}` });
+    if ((a.tipo === 'etf' || a.tipo === 'fondo') && isin) L.push({ g: 'ETFs y fondos', n: 'Morningstar', u: enWeb('morningstar.es', isin) });
+    if (a.webInversores) L.push({ g: 'La empresa', n: 'Web de inversores', u: /^https?:\/\//.test(a.webInversores) ? a.webInversores : 'https://' + a.webInversores });
+    return L;
+  }
+  /* Fila de botones, agrupados */
+  function botones(a) {
+    const L = de(a), grupos = [...new Set(L.map(x => x.g))];
+    return `<div class="enlaces">${grupos.map(g => `<div class="enl-g"><span>${g}</span>${L.filter(x => x.g === g)
+      .map(x => `<a class="btn mini" href="${Util.esc(x.u)}" target="_blank" rel="noopener">${x.n} ↗</a>`).join('')}</div>`).join('')}
+      ${!codigo(a) && a.tipo !== 'fondo' ? `<p class="small mut" style="margin:6px 0 0">Sin código de bolsa: ponlo en «Identidad» (por ejemplo BME:ITX) para tener Google y Yahoo, y el precio automático.</p>` : ''}</div>`;
+  }
+  function ventana(id) {
+    const a = Store.activo(id); if (!a) return;
+    Modal.abrir({ titulo: `Enlaces · ${a.ticker}`, cuerpo: `<p class="small mut" style="margin:0 0 12px">${Util.esc(a.nombre)}${a.isin ? ' · ' + Util.esc(a.isin) : ''}. Se abren aparte; la consola sigue aquí.</p>${botones(a)}`,
+      pie: `<button class="btn" data-cerrar>Cerrar</button>` });
+  }
+  return { BOLSAS, codigo, yahoo, de, botones, ventana, bolsaDe, bolsaNombre };
+})();
+
 const Ficha = (() => {
 
   function abrir(id) {
@@ -6558,6 +6730,10 @@ const Ficha = (() => {
         <span class="pill tipo t-${a.tipo}">${TIPOS[a.tipo]}</span>
         <span class="mut small">${Util.esc(a.sector || '—')} · ${Util.esc(a.pais || '—')} · ${Util.esc(a.mercado || '—')}${a.isin ? ' · ' + Util.esc(a.isin) : ''}</span>
       </div>
+      <details class="mas-datos enl-ficha" style="margin:-4px 0 14px;border-top:0;padding-top:0">
+        <summary>Enlaces: cotización, noticias, documentos oficiales</summary>
+        ${Enlaces.botones(a)}
+      </details>
 
       ${v.motivos.length ? `<ul class="motivos" style="margin-bottom:16px">${v.motivos.map(mo => `
         <li class="${mo.severidad}"><i class="sev"></i><div><b>${Util.esc(mo.nombre)}</b><p>${Util.esc(mo.texto)}</p></div></li>`).join('')}</ul>`
@@ -6730,6 +6906,21 @@ const Ficha = (() => {
                 </span></li>`).join('')}</ul></div></div>`;
           })()}
 
+          <div class="card"><div class="card-h"><h3>Identidad</h3><div class="sub">Qué es y dónde cotiza</div></div><div class="card-b">
+            <div class="form-grid">
+              <div class="field"><label>Nombre</label><input id="fi-nb" value="${Util.esc(a.nombre)}"></div>
+              <div class="field"><label>Tipo</label><select id="fi-tp">${Object.entries(TIPOS).map(([k, l]) => `<option value="${k}" ${a.tipo === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+                <small class="mut">Bono incluye las letras: tributan como rendimiento del capital.</small></div>
+              <div class="field"><label>ISIN</label><input id="fi-is" value="${Util.esc(a.isin || '')}" autocapitalize="characters"></div>
+              <div class="field"><label>Sector</label><input id="fi-sc" value="${Util.esc(a.sector || '')}"></div>
+              <div class="field"><label>País</label><input id="fi-pa" value="${Util.esc(a.pais || '')}"></div>
+              <div class="field"><label>Bolsa</label><select id="fi-bo"><option value="">—</option>${Object.keys(Enlaces.BOLSAS).filter(k => k !== 'Xetra').map(k => `<option ${Enlaces.bolsaDe(a) === k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
+              <div class="field"><label>Código de bolsa</label><input id="fi-cz" value="${Util.esc(a.cotizar || '')}" placeholder="${Util.esc(Enlaces.codigo(Object.assign({}, a, { cotizar: '' })) || 'p. ej. BME:ITX')}" autocapitalize="characters">
+                <small class="mut">El de Google Finance. Vacío: se deduce de la bolsa y el ticker.</small></div>
+              <div class="field"><label>Web de inversores</label><input id="fi-wi" value="${Util.esc(a.webInversores || '')}" placeholder="https://…"></div>
+            </div>
+          </div></div>
+
           <div class="card"><div class="card-h"><h3>Seguimiento</h3></div><div class="card-b">
             <div class="form-grid">
               <div class="field"><label>Última revisión</label><input type="date" id="fi-ult" value="${a.seguimiento.ultimaRevision || ''}"></div>
@@ -6817,8 +7008,21 @@ const Ficha = (() => {
             a.valoracion[k].precio = Util.n($('#fi-' + k + '-p').value);
             a.valoracion[k].prob = Util.n($('#fi-' + k + '-q').value);
           });
-          Store.log(a, 'Precio', a.cotizacion.precio, $('#fi-precio').value);
-          a.cotizacion.precio = Util.n($('#fi-precio').value);
+          /* Si cambias el precio aquí, su fecha pasa a ser hoy */
+          if (Util.n($('#fi-precio').value) !== Util.n(a.cotizacion.precio)) {
+            Store.log(a, 'Precio', a.cotizacion.precio, $('#fi-precio').value);
+            a.cotizacion.precio = Util.n($('#fi-precio').value);
+            a.cotizacion.fecha = Util.hoy();
+          }
+          const camb = (campo, et, v) => { if ((a[campo] || '') !== v) { Store.log(a, et, a[campo] || '—', v || '—'); a[campo] = v; } };
+          camb('nombre', 'Nombre', $('#fi-nb').value.trim() || a.nombre);
+          camb('tipo', 'Tipo', $('#fi-tp').value);
+          camb('isin', 'ISIN', $('#fi-is').value.trim().toUpperCase());
+          camb('sector', 'Sector', $('#fi-sc').value.trim());
+          camb('pais', 'País', $('#fi-pa').value.trim());
+          camb('mercado', 'Bolsa', $('#fi-bo').value);
+          camb('cotizar', 'Código de bolsa', $('#fi-cz').value.trim().toUpperCase());
+          camb('webInversores', 'Web de inversores', $('#fi-wi').value.trim());
           a.cotizacion.max52 = Util.n($('#fi-max').value);
           a.cotizacion.min52 = Util.n($('#fi-min').value);
           a.cotizacion.per = Util.n($('#fi-per').value);
@@ -7067,7 +7271,7 @@ const Ops = (() => {
           <div class="field"><label>Tipo</label><select id="op-tp">
             ${[['compra', 'Compra'], ['venta', 'Venta'], ['dividendo', 'Dividendo'], ['comision', 'Gasto']]
               .map(([k, l]) => `<option value="${k}" ${k === (tipo || 'compra') ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-          <div class="field"><label>Fecha</label><input type="date" id="op-fe" value="${Util.hoy()}"></div>
+          <div class="field"><label>Fecha</label><input type="date" id="op-fe" value="${previo.fecha || Util.hoy()}"></div>
           <div class="field"><label>Títulos</label><input type="number" step="any" id="op-ti" value="${previo.titulos || ''}"></div>
           <div class="field"><label>Precio por título</label><input type="number" step="any" id="op-pr" value="${previo.precio || ''}"></div>
           <div class="field"><label>Importe (dividendo o gasto)</label><input type="number" step="any" id="op-im"></div>
@@ -7076,9 +7280,18 @@ const Ops = (() => {
           <div class="field"><label>Cuenta</label><input id="op-cu" placeholder="Bróker principal" value="${Util.esc(previo.cuenta || '')}"></div>
         </div>
         <div class="field" style="margin-top:12px"><label>Por qué lo haces</label>
-          <textarea id="op-mo" placeholder="El motivo de hoy es lo que leerás dentro de tres años intentando entender qué pensabas"></textarea></div>`,
+          <textarea id="op-mo" placeholder="El motivo de hoy es lo que leerás dentro de tres años intentando entender qué pensabas">${Util.esc(previo.motivo || '')}</textarea></div>`,
       pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn pri" id="op-ok">Registrar</button>`,
-      alAbrir: () => $('#op-ok').onclick = () => {
+      alAbrir: () => {
+        /* Para un bono, «venta» es también el vencimiento y «dividendo» es el cupón */
+        const rotular = () => {
+          const a = Store.activo($('#op-ac').value), bono = a && a.tipo === 'bono';
+          const o = k => $(`#op-tp option[value="${k}"]`);
+          o('venta').textContent = bono ? 'Vencimiento o venta' : 'Venta';
+          o('dividendo').textContent = bono ? 'Cupón' : 'Dividendo';
+        };
+        $('#op-ac').addEventListener('change', rotular); rotular();
+        $('#op-ok').onclick = () => {
         const t = $('#op-tp').value;
         const titulos = Util.n($('#op-ti').value);
         if ((t === 'compra' || t === 'venta') && !titulos) { Util.toast('Indica cuántos títulos', 'err'); return; }
@@ -7089,6 +7302,7 @@ const Ops = (() => {
           cuenta: $('#op-cu').value.trim(), motivo: $('#op-mo').value.trim()
         });
         Store.save(); Modal.cerrar(); Util.toast('Operación registrada');
+      };
       }
     });
   }
@@ -7129,7 +7343,17 @@ const Ops = (() => {
     Modal.abrir({
       titulo: 'Actualizar precios',
       cuerpo: `
-        <p class="soft small" style="margin-bottom:12px">Tres formas, la que te venga mejor ese día.</p>
+        ${(() => {
+          if (typeof Precios === 'undefined') return '';
+          const on = Precios.conf().activo, con = Nube.hayClientId() && Nube.estado().conectado, e = Precios.estado();
+          return `<div class="card"><div class="card-h"><h3>Automático</h3><div class="sub">Google Finance · acciones y ETF</div></div><div class="card-b">
+            ${con ? `<p class="small" style="margin:0 0 8px">${on ? 'Encendido: se traen solos al abrir la consola.' : 'Apagado: puedes traerlos ahora o encenderlo en Ajustes.'}
+              ${e.ultima ? ` Última vez: ${new Date(e.ultima).toLocaleString('es-ES')}.` : ''}</p>
+              <button class="btn pri mini" id="pp-auto">Traer de Google Finance ahora</button>`
+            : `<p class="small mut" style="margin:0">Conecta con Drive en Ajustes y enciende «Precios automáticos» para no tener que hacerlo a mano.</p>`}
+          </div></div>`;
+        })()}
+        <p class="soft small" style="margin:12px 0">O a mano, la que te venga mejor ese día.</p>
         <div class="card"><div class="card-h"><h3>Uno a uno</h3></div>
           <div class="card-b tight tbl-wrap"><table>
             <thead><tr><th>Activo</th><th class="r">Precio guardado</th><th class="r" style="width:130px">Nuevo</th></tr></thead>
@@ -7146,6 +7370,7 @@ const Ops = (() => {
             <button class="btn pri" id="pp-ok">Guardar precios</button>`,
       alAbrir: () => {
         $('#pp-paquete').onclick = () => { Modal.cerrar(); Datos.paquete(); };
+        const au = $('#pp-auto'); if (au) au.onclick = () => { Modal.cerrar(); Precios.ahora(); };
         $('#pp-ok').onclick = () => {
           let n = 0;
           $$('[data-pp]').forEach(i => {
@@ -7156,7 +7381,9 @@ const Ops = (() => {
           });
           const txt = $('#pp-txt').value.trim();
           if (txt) txt.split(/\r?\n/).forEach(l => {
-            const c = l.split(/[;,\t]/).map(x => x.trim());
+            /* «TAR;41,20»: si hay punto y coma o tabulador, la coma es la decimal */
+            const c = (/[;\t]/.test(l) ? l.split(/[;\t]/) : l.split(',')).map(x => x.trim());
+            if (c.length > 2) c[1] = c.slice(1).join(',');
             if (c.length < 2) return;
             const a = Store.activos().find(x => x.ticker.toUpperCase() === c[0].toUpperCase());
             if (!a) return;
@@ -7299,6 +7526,47 @@ const Datos = (() => {
   return { exportar, importar, paquete, cargarTexto, esPaquete };
 })();
 
+/* ═══════════════ PRIVACIDAD DE LOS ENCARGOS ═══════════════
+   Qué se cuenta de tu posición al pedir un estudio o un seguimiento.
+   Por defecto, nada: para saber si una empresa va bien no hace falta
+   saber cuánto tienes. Los pesos solo sirven para hablar de tamaño y
+   de fiscalidad, y las cantidades, para un consejo fiscal concreto. */
+const Privacidad = (() => {
+  const NIVELES = [
+    ['empresa', 'Solo la empresa', 'ni una cifra tuya: ni títulos, ni pesos, ni resultado'],
+    ['pesos', 'Con pesos', 'lo que pesa cada posición y si va ganando o perdiendo, en %'],
+    ['completo', 'Completo', 'títulos, coste medio, resultado y desde cuándo la tienes']
+  ];
+  const nivel = () => { const n = Store.ajustes().privacidadEncargos; return NIVELES.some(x => x[0] === n) ? n : 'empresa'; };
+  const poner = n => { Store.ajustes().privacidadEncargos = n; Store.guardar(); };
+  /* La línea «Situación» de cada empresa según el nivel */
+  function situacion(a, n) {
+    n = n || nivel();
+    if (a.estado !== 'cartera') return 'en vigilancia, sin posición';
+    const p = Calc.posicion(a.id);
+    if (n === 'empresa' || !p.abierta) return 'en cartera';
+    const c = Calc.cartera();
+    const pct = `${Util.num(c.pesoDe(a.id), 1)} % de la cartera, va ${Util.signo(p.latentePct, 0)} %`;
+    if (n === 'pesos') return `en cartera · ${pct}`;
+    const desde = Calc.lotes(a.id)[0];
+    return `en cartera · ${Util.num(p.titulos, p.titulos < 10 ? 4 : 0)} títulos · coste medio ${Util.num(p.costeMedio)} ${a.divisa || 'EUR'} · ${pct}${desde ? ` · desde ${Util.fecha(desde.fecha)}` : ''}`;
+  }
+  /* Lo que se le dice a quien hace el estudio, para que no pregunte ni suponga */
+  function aviso(n) {
+    n = n || nivel();
+    if (n === 'empresa') return 'Por privacidad no te paso cuánto tengo de cada una: analiza la empresa, no mi posición. Si algo depende del tamaño de la posición o de mi fiscalidad, dilo y lo decido yo.';
+    if (n === 'pesos') return 'Te paso solo lo que pesa cada posición y si va ganando o perdiendo, en porcentaje. Úsalo para hablar de tamaño y de fiscalidad, no para el análisis de la empresa.';
+    return 'Te paso mis cantidades porque esta vez quiero también consejo sobre tamaño y fiscalidad. No las necesitas para analizar la empresa.';
+  }
+  /* El selector, igual en los dos encargos */
+  function selector(id) {
+    const n = nivel();
+    return `<div class="field priv-sel"><label>Qué cuento de mis posiciones</label>
+      <select id="${id}">${NIVELES.map(([k, t, d]) => `<option value="${k}" ${k === n ? 'selected' : ''}>${t}: ${d}</option>`).join('')}</select></div>`;
+  }
+  return { NIVELES, nivel, poner, situacion, aviso, selector };
+})();
+
 /* ═══════════════ ENCARGO DE SEGUIMIENTO ═══════════════
    Convierte el estado de la cartera en un encargo listo para pegar en un chat.
    La gracia no es pedir «novedades»: es pedir que se compruebe cada hipótesis
@@ -7316,7 +7584,7 @@ const Encargo = (() => {
       const L = [];
       L.push(`── ${a.ticker} · ${a.nombre}`);
       L.push(`   ${TIPOS[a.tipo]} · ${a.sector || 'sector sin anotar'} · ${a.pais || 'país sin anotar'}${a.isin ? ' · ISIN ' + a.isin : ''}${a.mercado ? ' · ' + a.mercado : ''}`);
-      L.push(`   Situación: ${a.estado === 'cartera' ? 'en cartera' : 'en vigilancia, sin posición'}${p.abierta ? `, ${Util.num(p.titulos, p.titulos < 10 ? 4 : 0)} títulos` : ''}`);
+      L.push(`   Situación: ${Privacidad.situacion(a)}`);
       L.push(`   Precio que tengo guardado: ${Util.num(a.cotizacion.precio)} ${a.divisa} a fecha ${a.cotizacion.fecha || 'desconocida'}`);
       L.push(a.serie.length
         ? `   Histórico de indicadores: ${a.serie.length} tomas, la última del ${Util.fecha(a.serie[a.serie.length - 1].fecha)}${a.serie[a.serie.length - 1].fuente ? ' (' + a.serie[a.serie.length - 1].fuente + ')' : ''}`
@@ -7375,6 +7643,7 @@ const Encargo = (() => {
     return [
       `ENCARGO DE SEGUIMIENTO DE CARTERA · preparado el ${Util.fecha(Util.hoy())}`,
       desde ? `Periodo a cubrir: desde el ${Util.fecha(desde)} hasta hoy.` : 'Periodo a cubrir: los últimos tres meses.',
+      Privacidad.aviso(),
       '',
       'Haz de analista de seguimiento de mi cartera. Busca en la web qué ha pasado con los activos de la lista durante el periodo y devuélveme el resultado como un único bloque JSON con el esquema del final, sin texto antes ni después.',
       '',
@@ -7419,11 +7688,13 @@ const Encargo = (() => {
         <p class="soft small" style="margin-bottom:12px">
           Cópialo y pégalo en un chat nuevo, o guárdalo como instrucción de una tarea programada
           para que se repita solo. Lo que te devuelva se carga con «Cargar informe».</p>
+        ${Privacidad.selector('en-priv')}
         <textarea id="en-txt" style="min-height:420px;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:12px;line-height:1.5">${Util.esc(t)}</textarea>`,
       pie: `<button class="btn" data-cerrar>Cerrar</button>
             <button class="btn" id="en-txt-dl">Guardar como archivo</button>
             <button class="btn pri" id="en-copiar">Copiar al portapapeles</button>`,
       alAbrir: () => {
+        $('#en-priv').onchange = () => { Privacidad.poner($('#en-priv').value); $('#en-txt').value = texto(); };
         $('#en-copiar').onclick = () => {
           const ta = $('#en-txt'); ta.select();
           navigator.clipboard ? navigator.clipboard.writeText(ta.value).then(
@@ -7475,15 +7746,21 @@ const Encargo = (() => {
 const Sim = (() => {
   let id = null;
 
+  /* Títulos que tenías en una fecha: para una venta pasada, no los de hoy */
+  const titulosEn = f => Calc.lotes(id, f).reduce((s2, l) => s2 + l.titulos, 0);
+
   function pintar() {
-    const p = Calc.posicion(id);
-    const tit = Math.min(Util.n($('#sm-tit').value), p.titulos);
+    const fecha = $('#sm-fe').value || Util.hoy();
+    const max = titulosEn(fecha);
+    $('#sm-tit-l').textContent = `Títulos a vender (${fecha < Util.hoy() ? 'el ' + Util.fecha(fecha) + ' tenías' : 'tienes'} ${Util.num(max, max % 1 ? 4 : 0)})`;
+    const tit = Math.min(Util.n($('#sm-tit').value), max);
     const precio = Util.n($('#sm-pr').value);
     const com = Util.n($('#sm-co').value);
     Store.ajustes().otrasGanancias = Util.n($('#sm-otras').value);
     Store.ajustes().minusvaliasPendientes = Util.n($('#sm-min').value);
+    if (!max) { $('#sm-res').innerHTML = `<div class="vacio">El ${Util.fecha(fecha)} no tenías títulos: la compra es posterior.</div>`; return; }
     if (!tit || !precio) { $('#sm-res').innerHTML = `<div class="vacio">Indica cuántos títulos y a qué precio.</div>`; return; }
-    const r = Calc.simularVenta(id, tit, precio, com);
+    const r = Calc.simularVenta(id, tit, precio, com, fecha);
     const tope = Util.n(Store.ajustes().topePosicion);
 
     $('#sm-res').innerHTML = `
@@ -7492,15 +7769,15 @@ const Sim = (() => {
           <div class="kv"><span>Importe bruto</span><b class="num">${Util.eur(r.bruto, 0)}</b></div>
           <div class="kv"><span>Coste de los títulos que salen (FIFO)</span><b class="num">${Util.eur(r.coste, 0)}</b></div>
           <div class="kv"><span>Comisión</span><b class="num">${Util.eur(r.comision, 0)}</b></div>
-          <div class="kv"><span>${r.ganancia >= 0 ? 'Ganancia' : 'Pérdida'} patrimonial</span>
+          <div class="kv"><span>${r.esBono ? (r.ganancia >= 0 ? 'Rendimiento del capital' : 'Rendimiento del capital negativo') : (r.ganancia >= 0 ? 'Ganancia patrimonial' : 'Pérdida patrimonial')}</span>
             <b class="num ${r.ganancia >= 0 ? 'pos' : 'neg'}">${Util.eur(r.ganancia, 0)}</b></div>
           <div class="kv"><span>Impuesto estimado</span><b class="num">${Util.eur(r.impuesto, 0)}</b></div>
           <div class="kv"><span><b>Te queda en el bolsillo</b></span><b class="num">${Util.eur(r.liquidez, 0)}</b></div>
         </div></div>
         <div class="card" style="margin:0"><div class="card-h"><h3>Cómo queda la cartera</h3></div><div class="card-b">
           <div class="kv"><span>Títulos</span><b class="num">${Util.num(r.p.titulos, 4)} → ${Util.num(r.titulosRestantes, 4)}</b></div>
-          <div class="kv"><span>Peso</span><b class="num">${Util.num(r.pesoAntes, 1)} % → ${Util.num(r.pesoDespues, 1)} %
-            ${tope && r.pesoDespues > tope ? '<span class="neg">sigue por encima del tope</span>' : ''}</b></div>
+          ${r.pasada ? '' : `<div class="kv"><span>Peso</span><b class="num">${Util.num(r.pesoAntes, 1)} % → ${Util.num(r.pesoDespues, 1)} %
+            ${tope && r.pesoDespues > tope ? '<span class="neg">sigue por encima del tope</span>' : ''}</b></div>`}
           <div class="kv"><span>Coste medio de lo que se queda</span><b class="num">${Util.num(r.cierraPosicion ? 0 : (r.p.coste - r.coste) / r.titulosRestantes, 2)} €</b></div>
           <div class="kv"><span>Resultado</span><b>${r.cierraPosicion ? 'Cierras la posición entera' : 'Mantienes una parte'}</b></div>
         </div></div>
@@ -7520,7 +7797,7 @@ const Sim = (() => {
               <td class="r num ${res >= 0 ? 'pos' : 'neg'}">${Util.eur(res, 0)}</td></tr>`;
           }).join('')}</tbody></table></div></div>
 
-      ${r.recompra ? `<ul class="motivos" style="margin-top:14px"><li class="${r.comprasRecientes.length ? 'critica' : 'alta'}"><i class="sev"></i><div>
+      ${r.recompra && !r.esBono ? `<ul class="motivos" style="margin-top:14px"><li class="${r.comprasRecientes.length ? 'critica' : 'alta'}"><i class="sev"></i><div>
         <b>${r.comprasRecientes.length
           ? (r.titulosAparcados >= r.titulos - 0.0000001 ? 'Esta pérdida no te la vas a poder compensar todavía' : 'Parte de esta pérdida queda aparcada')
           : 'Vendes con pérdidas: cuidado con recomprar'}</b>
@@ -7530,6 +7807,7 @@ const Sim = (() => {
               : `Esa parte de la pérdida (unos ${Util.eur(Math.abs(r.ganancia) * Math.min(1, r.titulosAparcados / r.titulos), 0)} de ${Util.eur(Math.abs(r.ganancia), 0)})`} queda aparcada hasta que vendas también esos títulos.`
           : `Si vuelves a comprar ${Util.esc(r.a.ticker)} dentro de los dos meses siguientes, la pérdida no se puede compensar hasta que vendas los títulos nuevos. ${r.cierraPosicion ? 'Cerrando la posición entera y sin recomprar, computa toda.' : ''}`}</p></div></li></ul>` : ''}
 
+      ${r.esBono ? `<p class="nota-graf">Es un bono: lo que ganes o pierdas al venderlo o al vencer tributa como rendimiento del capital (como los intereses), no como ganancia patrimonial. Fiscal ya lo cuenta así.</p>` : ''}
       <p class="nota-graf">El impuesto es una estimación con la escala estatal del ahorro sobre los datos que has puesto arriba. No incluye nada más que haya pasado en tu declaración, y no soy asesor fiscal: para una operación grande, consúltalo.</p>`;
   }
 
@@ -7537,14 +7815,19 @@ const Sim = (() => {
     id = activoId;
     const a = Store.activo(id), p = Calc.posicion(id), aj = Store.ajustes();
     if (!p.abierta) { Util.toast('No tienes títulos de ' + a.ticker, 'err'); return; }
+    const bono = a.tipo === 'bono';
     Modal.abrir({
-      titulo: 'Simular venta de ' + a.ticker, ancho: true,
+      titulo: (bono ? 'Vencimiento o venta de ' : 'Simular venta de ') + a.ticker, ancho: true,
       cuerpo: `
         <div class="form-grid">
-          <div class="field"><label>Títulos a vender (tienes ${Util.num(p.titulos, p.titulos < 10 ? 4 : 0)})</label>
-            <input type="number" step="any" min="0" max="${p.titulos}" id="sm-tit" value="${p.titulos}"></div>
-          <div class="field"><label>Precio de venta</label>
-            <input type="number" step="any" id="sm-pr" value="${Util.n(a.cotizacion.precio)}"></div>
+          <div class="field"><label>${bono ? 'Fecha del vencimiento o de la venta' : 'Fecha de la venta'}</label>
+            <input type="date" id="sm-fe" value="${Util.hoy()}" max="${Util.hoy()}">
+            <small class="mut">Si ya la hiciste, pon el día: calcula con lo que tenías entonces.</small></div>
+          <div class="field"><label id="sm-tit-l">Títulos a vender (tienes ${Util.num(p.titulos, p.titulos < 10 ? 4 : 0)})</label>
+            <input type="number" step="any" min="0" id="sm-tit" value="${p.titulos}"></div>
+          <div class="field"><label>${bono ? 'Lo que te devolvieron por título' : 'Precio de venta'}</label>
+            <input type="number" step="any" id="sm-pr" value="${Util.n(a.cotizacion.precio)}">
+            ${bono ? '<small class="mut">Al vencer suele ser el nominal: 1.000 € por letra, o 100 si cuentas en porcentaje.</small>' : ''}</div>
           <div class="field"><label>Comisión</label><input type="number" step="any" id="sm-co" value="0"></div>
         </div>
         <div class="toolbar no-print" style="margin-top:8px">
@@ -7558,17 +7841,21 @@ const Sim = (() => {
         </div>
         <div id="sm-res" style="margin-top:16px"></div>`,
       pie: `<button class="btn" data-cerrar>Cerrar</button>
-            <button class="btn pri" id="sm-registrar">Registrar esta venta</button>`,
+            <button class="btn pri" id="sm-registrar">${bono ? 'Registrar el vencimiento o la venta' : 'Registrar esta venta'}</button>`,
       alAbrir: () => {
         ['#sm-tit', '#sm-pr', '#sm-co', '#sm-otras', '#sm-min'].forEach(sel => $(sel).oninput = pintar);
+        /* Al cambiar la fecha, los títulos pasan a ser los que tenías ese día */
+        $('#sm-fe').onchange = () => { $('#sm-tit').value = +titulosEn($('#sm-fe').value || Util.hoy()).toFixed(6); pintar(); };
         $$('[data-parte]').forEach(b => b.onclick = () => {
-          $('#sm-tit').value = +(p.titulos * Util.n(b.dataset.parte) / 100).toFixed(6); pintar();
+          $('#sm-tit').value = +(titulosEn($('#sm-fe').value || Util.hoy()) * Util.n(b.dataset.parte) / 100).toFixed(6); pintar();
         });
         $('#sm-registrar').onclick = () => {
-          const tit = Math.min(Util.n($('#sm-tit').value), p.titulos);
+          const fecha = $('#sm-fe').value || Util.hoy();
+          const tit = Math.min(Util.n($('#sm-tit').value), titulosEn(fecha));
           if (!tit) { Util.toast('Indica cuántos títulos', 'err'); return; }
           Modal.cerrar();
-          Ops.nueva(id, 'venta', { titulos: tit, precio: Util.n($('#sm-pr').value), comision: Util.n($('#sm-co').value) });
+          Ops.nueva(id, 'venta', { titulos: tit, precio: Util.n($('#sm-pr').value), comision: Util.n($('#sm-co').value), fecha,
+            motivo: bono ? 'Vencimiento' : '' });
         };
         pintar();
       }

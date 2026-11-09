@@ -64,7 +64,8 @@ const Estudio = (() => {
       cuerpo: `
         <p class="soft small" style="margin-bottom:14px">
           Elige qué empresas y qué quieres que mire. El encargo que sale abajo lleva tus hipótesis
-          con su plazo y lo último que sabías de cada una, para que el estudio hable de tu tesis.</p>
+          con su plazo y lo último que sabías de cada una, para que el estudio hable de tu tesis.
+          De tus posiciones, solo lo que elijas abajo.</p>
 
         <div class="form-grid">
           <div class="field"><label>Qué empresas</label>
@@ -86,7 +87,8 @@ const Estudio = (() => {
             <input type="checkbox" data-es-mirar="${k}" ${g.mirar.includes(k) ? 'checked' : ''} style="width:auto;margin:0">
             <span>${n}</span></label>`).join('')}</div>
 
-        <div class="field" style="margin-top:14px"><label>Algo más que quiera pedir esta vez</label>
+        <div style="margin-top:14px">${Privacidad.selector('es-priv')}</div>
+        <div class="field" style="margin-top:2px"><label>Algo más que quiera pedir esta vez</label>
           <textarea id="es-extra" style="min-height:52px"
             placeholder="Por ejemplo: mira si han publicado el plan estratégico">${Util.esc(g.extra)}</textarea></div>
 
@@ -143,6 +145,7 @@ const Estudio = (() => {
 
         document.querySelector('#es-alcance').onchange = () => { sel = new Set(); pintarLista(); };
         document.querySelector('#es-fondo').onchange = refrescar;
+        document.querySelector('#es-priv').onchange = () => { Privacidad.poner(document.querySelector('#es-priv').value); refrescar(); };
         document.querySelector('#es-extra').oninput = refrescar;
         document.querySelectorAll('[data-es-mirar]').forEach(x => x.onchange = refrescar);
         document.querySelector('#es-cp').onclick = () => {
@@ -170,7 +173,7 @@ const Estudio = (() => {
       const L = [];
       L.push(`── ${a.ticker} · ${a.nombre}`);
       L.push(`   ${TIPOS[a.tipo]} · ${a.sector || 'sector sin anotar'} · ${a.pais || 'país sin anotar'}${a.isin ? ' · ISIN ' + a.isin : ''}`);
-      L.push(`   ${a.estado === 'cartera' ? `En cartera: ${Util.num(p.titulos, p.titulos < 10 ? 4 : 0)} títulos, ${Util.num(c.pesoDe(a.id), 1)} % de la cartera` : 'En vigilancia, sin posición'}`);
+      L.push(`   Situación: ${Privacidad.situacion(a)}`);
       L.push(`   Precio que tengo guardado: ${Util.num(a.cotizacion.precio)} ${a.divisa} del ${a.cotizacion.fecha || 'fecha desconocida'}`);
       L.push(`   Tomas de indicadores: ${(a.serie || []).length}${(a.serie || []).length ? `, la última del ${Util.fecha(a.serie[a.serie.length - 1].fecha)}` : ''}`);
       L.push(a.fundamentales.length
@@ -210,6 +213,7 @@ const Estudio = (() => {
       `ENCARGO DE ESTUDIO · ${Util.fecha(hoy)}`,
       aj.ultimoInforme ? `Periodo a cubrir: desde el ${Util.fecha(aj.ultimoInforme)} hasta hoy.`
                        : 'Periodo a cubrir: los últimos tres meses.',
+      Privacidad.aviso(),
       '',
       v.fondo
         ? `Estudia a fondo estas ${acts.length} ${acts.length === 1 ? 'empresa' : 'empresas'} y devuélveme el resultado como un único bloque JSON con el esquema del final, sin texto antes ni después.`
