@@ -576,6 +576,25 @@ tr.fila-papel td{background:var(--papel-tarjeta)}
 .imp-n{display:flex;align-items:baseline;gap:10px;padding:8px 12px;border-radius:var(--r);background:var(--c-surface-2);font-size:13.5px}
 .imp-n b{font-size:18px;font-variant-numeric:tabular-nums;min-width:28px;text-align:right}
 .imp-n.si{background:var(--v-mantener-bg);color:var(--v-mantener)}
+.imp-n.aviso{background:var(--v-reducir-bg, var(--c-surface-2));color:var(--v-reducir, inherit)}
+.imp-fichas td small{color:var(--c-muted)}
+@media (max-width:760px){
+  /* En el móvil, una ficha por valor: con cinco columnas, «Qué pasa» quedaba fuera */
+  .tbl-cuadre thead{display:none}
+  .tbl-cuadre,.tbl-cuadre tbody{display:block}
+  .tbl-cuadre tr{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 10px;padding:12px 2px;border-bottom:1px solid var(--c-border)}
+  .tbl-cuadre td{display:block;padding:0;border:0;text-align:left}
+  .tbl-cuadre td:first-child,.tbl-cuadre td:last-child{grid-column:1/-1}
+  .tbl-cuadre td[data-l]::before{content:attr(data-l);display:block;font-size:11px;color:var(--c-muted);font-weight:500}
+  .tbl-cuadre td:last-child{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:4px}
+  .tbl-cuadre td:last-child br{display:none}
+  .tbl-cuadre td:last-child input{margin-top:0 !important}
+}
+.cuadres{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.cuadre{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--r);background:var(--c-surface)}
+.cuadre > span:first-child{flex:1;min-width:200px;font-size:13px}
+.cuadre .btns{display:flex;gap:6px;flex-wrap:wrap}
 .imp-fichas input.imp-tk{width:100px;font-variant-numeric:tabular-nums;text-transform:uppercase}
 .imp-fichas td small{display:block;font-size:11px;margin-top:3px}
 .imp-fichas select{min-width:96px}
@@ -4312,16 +4331,38 @@ const Vistas = (() => {
       /* Un activo marcado «en cartera» pero sin compra registrada no tiene
          posición, así que no saldría en esta tabla ni en vigilancia: se
          quedaría invisible. Aquí se ve y se arregla en un clic. */
-      const huerfanos = Store.activos().filter(a => a.estado === 'cartera' && !Calc.posicion(a.id).abierta);
+      /* Lo que no cuadra: activos «en cartera» sin compra registrada, y los que
+         el bróker dice que tienes en otra cantidad. Se compara con lo que tenías
+         EN LA FECHA DEL EXTRACTO, para que una compra posterior no parezca un error. */
+      const titulosEn = (a, f) => Store.ops().filter(o => o.activoId === a.id && (o.fecha || '') <= f)
+        .reduce((s2, o) => s2 + (o.tipo === 'compra' ? Util.n(o.titulos) : o.tipo === 'venta' ? -Util.n(o.titulos) : 0), 0);
+      const nf = x => Util.num(x, Math.abs(x) % 1 ? 6 : 0).replace(/(,\d*?)0+$/, '$1').replace(/,$/, '');
+      const pendientes = Store.activos().map(a => {
+        if (a.cuadre && a.cuadre.fecha) {
+          const aqui = titulosEn(a, a.cuadre.fecha), dif = Util.n(a.cuadre.titulos) - aqui;
+          if (Math.abs(dif) > 0.000001) return { a, dif, aqui, broker: Util.n(a.cuadre.titulos), cuenta: a.cuadre.cuenta, fecha: a.cuadre.fecha };
+          return null;
+        }
+        if (a.estado === 'cartera' && !Calc.posicion(a.id).abierta) return { a, sinCompra: true };
+        return null;
+      }).filter(Boolean);
       const zonaH = $('#cartera-huerfanos');
-      if (zonaH) zonaH.innerHTML = !huerfanos.length ? '' : `
+      if (zonaH) zonaH.innerHTML = !pendientes.length ? '' : `
         <ul class="motivos"><li class="alta"><i class="sev"></i><div>
-          <b>${huerfanos.length === 1 ? 'Un activo en cartera sin compra registrada' : `${huerfanos.length} activos en cartera sin compra registrada`}</b>
-          <p>Sin la compra no hay títulos ni coste, así que no puede salir en la tabla de arriba ni contar en los totales.</p>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-            ${huerfanos.map(a => `<button class="btn mini" data-huerfano="${a.id}">Registrar la compra de ${Util.esc(a.ticker)}</button>`).join('')}
-            ${huerfanos.map(a => `<button class="btn mini" data-avigilancia="${a.id}">Pasar ${Util.esc(a.ticker)} a vigilancia</button>`).join('')}
-          </div></div></li></ul>`;
+          <b>${pendientes.length === 1 ? 'Un valor no cuadra' : `${pendientes.length} valores no cuadran`}</b>
+          <p>Hasta que se apunte lo que falta, sus títulos, su coste y el informe fiscal no son fiables.</p>
+          <div class="cuadres">${pendientes.map(x => x.sinCompra ? `
+            <div class="cuadre"><span><b>${Util.esc(x.a.ticker)}</b> · en cartera, pero sin ninguna compra apuntada</span>
+              <span class="btns"><button class="btn mini" data-huerfano="${x.a.id}">Apuntar la compra</button>
+              <button class="btn mini" data-avigilancia="${x.a.id}">Pasar a vigilancia</button></span></div>` : `
+            <div class="cuadre"><span><b>${Util.esc(x.a.ticker)}</b> · ${Util.esc(x.cuenta || 'el bróker')} dice ${nf(x.broker)} el ${Util.fecha(x.fecha)};
+              aquí ${nf(x.aqui)}. ${x.dif > 0 ? `Falta una compra de ${nf(x.dif)}` : `Falta una venta de ${nf(-x.dif)}`}.</span>
+              <span class="btns"><button class="btn mini" data-cuadrar="${x.a.id}" data-cq-tipo="${x.dif > 0 ? 'compra' : 'venta'}" data-cq-tit="${Math.abs(x.dif)}">
+                Apuntar la ${x.dif > 0 ? 'compra' : 'venta'} de ${nf(Math.abs(x.dif))}</button>
+              <button class="btn mini" data-cq-olvidar="${x.a.id}" title="Si sabes que el extracto estaba mal">No hacer caso</button></span></div>`).join('')}
+          </div>
+          <p class="small mut" style="margin-top:8px">Lo más rápido suele ser importar el historial completo de movimientos del bróker.</p>
+          </div></li></ul>`;
 
       $('#tbl-cartera').innerHTML = `
         <thead><tr>
@@ -4555,6 +4596,15 @@ const Vistas = (() => {
       $$('[data-sim2]').forEach(b => b.onclick = () => Sim.abrir(b.dataset.sim2));
       $$('[data-comprar]').forEach(b => b.onclick = () => Ops.nueva(b.dataset.comprar, 'compra'));
       $$('[data-huerfano]').forEach(b => b.onclick = () => Ops.nueva(b.dataset.huerfano, 'compra'));
+      $$('[data-cuadrar]').forEach(b => b.onclick = () => {
+        const a = Store.activo(b.dataset.cuadrar);
+        Ops.nueva(a.id, b.dataset.cqTipo, { titulos: +b.dataset.cqTit, cuenta: (a.cuadre || {}).cuenta || '' });
+      });
+      $$('[data-cq-olvidar]').forEach(b => b.onclick = () => {
+        const a = Store.activo(b.dataset.cqOlvidar);
+        Store.marcar(`Olvidar el descuadre de ${a.ticker}`);
+        delete a.cuadre; Store.save();
+      });
       $$('[data-avigilancia]').forEach(b => b.onclick = () => {
         const a = Store.activo(b.dataset.avigilancia);
         Store.marcar(`${a.ticker} a vigilancia`);
@@ -4842,7 +4892,7 @@ const Vistas = (() => {
                 <p>Son tus operaciones: van a la cartera, no al universo de cribado.</p>
                 <button class="btn pri mini" id="cb-a-broker" style="margin-top:8px">Importarlo en mis operaciones</button></div></li></ul>`;
               $('#cb-ok').disabled = true;
-              $('#cb-a-broker').onclick = () => { Modal.cerrar(); setTimeout(() => Brokers.importar(crudo, 'Extracto pegado'), 220); };
+              $('#cb-a-broker').onclick = () => { Modal.cerrar(); setTimeout(() => Brokers.abrir(crudo, 'Extracto pegado'), 220); };
               return;
             }
             const paq = Datos.esPaquete(crudo);
@@ -7023,7 +7073,7 @@ const Ops = (() => {
           <div class="field"><label>Importe (dividendo o gasto)</label><input type="number" step="any" id="op-im"></div>
           <div class="field"><label>Comisión</label><input type="number" step="any" id="op-co" value="${previo.comision || 0}"></div>
           <div class="field"><label>Retención</label><input type="number" step="any" id="op-re" value="0"></div>
-          <div class="field"><label>Cuenta</label><input id="op-cu" placeholder="Bróker principal"></div>
+          <div class="field"><label>Cuenta</label><input id="op-cu" placeholder="Bróker principal" value="${Util.esc(previo.cuenta || '')}"></div>
         </div>
         <div class="field" style="margin-top:12px"><label>Por qué lo haces</label>
           <textarea id="op-mo" placeholder="El motivo de hoy es lo que leerás dentro de tres años intentando entender qué pensabas"></textarea></div>`,
@@ -7047,7 +7097,7 @@ const Ops = (() => {
   function importarCSV() {
     Util.leerArchivo('.csv,.txt', (txt, nombre) => {
       /* Un extracto de bróker (Trade Republic…) va por su importador */
-      if (typeof Brokers !== 'undefined' && Brokers.reconoce(txt)) { Brokers.importar(txt, nombre); return; }
+      if (typeof Brokers !== 'undefined' && Brokers.reconoce(txt)) { Brokers.abrir(txt, nombre); return; }
       const lineas = txt.split(/\r?\n/).filter(l => l.trim());
       if (lineas.length < 2) { Util.toast('El archivo está vacío', 'err'); return; }
       const sep = lineas[0].includes(';') ? ';' : ',';
@@ -7201,7 +7251,7 @@ const Datos = (() => {
 
   function cargarTexto(txt, nombre) {
     /* Si alguien abre aquí el extracto del bróker, se lleva a su sitio */
-    if (typeof Brokers !== 'undefined' && Brokers.reconoce(txt)) { Brokers.importar(txt, nombre); return; }
+    if (typeof Brokers !== 'undefined' && Brokers.reconoce(txt)) { Brokers.abrir(txt, nombre); return; }
     let d; try { d = JSON.parse(txt); } catch (e) { Util.toast('Ese archivo no es un JSON válido', 'err'); return; }
       const pv = Store.previsualizar(d);
       const reales = pv.cambios.filter(c => c.clase !== 'igual');

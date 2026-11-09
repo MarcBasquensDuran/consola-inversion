@@ -492,3 +492,42 @@ LO QUE CAMBIÓ EN FISCAL
   doble imposición con su propio límite. El programa las suma como
   si fueran lo mismo: para la declaración, la cifra buena es la del
   informe fiscal de Trade Republic.
+
+
+==============================================================
+CUADRAR CON EL EXTRACTO DE PATRIMONIO
+==============================================================
+
+  El «Extracto del patrimonio neto» de Trade Republic (el PDF pasado
+  a CSV o a texto) dice qué tienes un día concreto. Se abre por el
+  mismo botón: Operaciones → «Importar del bróker o CSV». El programa
+  distingue solo si es el extracto de movimientos o el de patrimonio.
+
+  QUÉ HACE
+
+  · Pone al día el precio de cada valor, con la fecha del extracto, y
+    lo guarda también como toma con fecha: así entra en las curvas.
+  · Compara los títulos del bróker con los de la consola, en la
+    fecha del extracto (una compra posterior no cuenta como error):
+      cuadra          los mismos títulos en los dos sitios
+      faltan X        falta apuntar alguna compra
+      sobran X        falta apuntar alguna venta
+      nuevo           no lo tenías: crea la ficha (por ISIN, con el
+                      ticker de la lista o unas iniciales a cambiar)
+  · Si el extracto dice que tienes 34 posiciones y solo trae 5, avisa
+    de que está incompleto. Si está completo, avisa también de lo que
+    la consola tiene abierto en ese bróker y el extracto ya no lista.
+  · El efectivo de la cuenta solo se anota: la consola sigue las
+    inversiones, no el dinero sin invertir.
+
+  LO QUE NO HACE
+
+  No se inventa compras ni ventas: sin su precio, el coste y el
+  informe fiscal saldrían mal. Lo que no cuadra queda marcado en
+  Cartera («Un valor no cuadra») con un botón «Apuntar la compra de
+  X» que abre el formulario con los títulos y la cuenta ya puestos.
+  Solo te falta el precio y la fecha. Si sabes que el extracto
+  estaba mal, «No hacer caso» quita el aviso.
+
+  Lo más rápido para que todo cuadre: importar el historial completo
+  de movimientos desde el primer día. Lo que ya esté no se duplica.

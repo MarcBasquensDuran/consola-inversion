@@ -116,7 +116,7 @@ const Brokers = (() => {
     const l = LECTORES.find(x => x.reconoce(cab));
     return l ? { lector: l, filas } : null;
   }
-  const reconoce = txt => !!lectorDe(txt);
+  const reconoce = txt => !!lectorDe(txt) || !!extractoPosiciones(txt);
 
   /* ---------- Del archivo al plan ---------- */
   const CLASES = { STOCK: 'accion', ETF: 'etf', FUND: 'fondo', BOND: 'bono', CRYPTO: 'cripto', DERIVATIVE: 'accion' };
@@ -327,9 +327,198 @@ const Brokers = (() => {
     Util.toast(`${n} movimientos importados de ${p.lector.nombre}. Se puede deshacer desde el aviso de arriba.`);
   }
 
-  function elegirArchivo() {
-    Util.leerArchivo('.csv,.txt', (txt, nombre) => importar(txt, nombre));
+
+  /* ═══════════ EXTRACTO DE PATRIMONIO (qué tienes hoy) ═══════════
+     El PDF «Extracto del patrimonio neto» de Trade Republic, pasado a texto
+     o a CSV. No dice qué hiciste, sino qué tienes: sirve para poner los
+     precios al día y para CUADRAR la consola con el bróker. */
+  const numES = x => {
+    let t = String(x || '').trim();
+    if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+    const n = parseFloat(t); return isFinite(n) ? n : 0;
+  };
+  const fechaES = s => { const m = String(s || '').match(/(\d{2})\.(\d{2})\.(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : ''; };
+
+  function lineasLimpias(txt) {
+    /* Un PDF pasado a CSV puede llegar con celdas entre comillas: se juntan
+       con dos espacios, que es lo que separa las columnas en el original */
+    return String(txt || '').replace(/^﻿/, '').split(/\r?\n/).map(l => {
+      if (/^\s*"/.test(l) && /","|";"/.test(l)) l = l.replace(/^\s*"|"\s*$/g, '').split(/"\s*[,;]\s*"/).join('   ');
+      else if (/^\s*".*"\s*$/.test(l)) l = l.trim().slice(1, -1).replace(/""/g, '"');
+      return l.replace(/\t/g, '   ');
+    });
   }
 
-  return { reconoce, importar, elegirArchivo, leerCSV, lectorDe, planificar, LECTORES };
+  function extractoPosiciones(txt) {
+    const L = lineasLimpias(txt);
+    const todo = L.join('\n');
+    if (!/PATRIMONIO NETO|CUENTA DE VALORES/i.test(todo) || !/ISIN:/i.test(todo) || !/unidades/i.test(todo)) return null;
+    const broker = /TRADE\s*REPUBLIC/i.test(todo) ? 'Trade Republic' : 'tu bróker';
+    const RX = /^\s*([\d.]+(?:,\d+)?)\s+(?:unidades|unidad|uds?\.?)\s+(.+?)\s{2,}([\d.]+,\d+)\s{2,}([\d.]+,\d+)\s*$/i;
+    const pos = [];
+    for (let i = 0; i < L.length; i++) {
+      const m = L[i].match(RX);
+      if (!m) continue;
+      const p = { titulos: numES(m[1]), nombre: m[2].trim(), precio: numES(m[3]), valor: numES(m[4]), isin: '', fecha: '', custodia: '' };
+      /* Lo que sigue hasta la línea en blanco: clase, fecha, ISIN, custodia */
+      for (let k = i + 1; k < Math.min(L.length, i + 7) && L[k].trim() && !RX.test(L[k]); k++) {
+        const isin = L[k].match(/ISIN:\s*([A-Z]{2}[A-Z0-9]{9}\d)/i);
+        if (isin) p.isin = isin[1].toUpperCase();
+        if (!p.fecha && fechaES(L[k])) p.fecha = fechaES(L[k]);
+        const cu = L[k].match(/(?:País de custodia|Cuenta de valores en)\s*:?\s*(.+)$/i);
+        if (cu) p.custodia = cu[1].trim();
+      }
+      if (p.isin && p.titulos > 0) pos.push(p);
+    }
+    if (!pos.length) return null;
+    const declaradas = (todo.match(/N[ÚU]MERO DE POSICIONES:\s*(\d+)/i) || [])[1];
+    const efectivo = (todo.match(/Cuenta corriente\s+([\d.]+,\d+)\s*EUR/i) || todo.match(/Efectivo\s+([\d.]+,\d+)/i) || [])[1];
+    const totalValores = (todo.match(/N[ÚU]MERO DE POSICIONES:\s*\d+\s+([\d.]+,\d+)/i) || [])[1];
+    const fechas = pos.map(p => p.fecha).filter(Boolean).sort();
+    const fechaEf = fechaES((todo.match(/efectivo en tu cuenta corriente a\s+(\d{2}\.\d{2}\.\d{4})/i) || [])[1]);
+    const creado = (todo.match(/Creado en\s+(\d{4}-\d{2}-\d{2})/i) || [])[1];
+    return {
+      broker, posiciones: pos, fecha: fechas[fechas.length - 1] || fechaEf || creado || Util.hoy(),
+      declaradas: declaradas ? +declaradas : null,
+      totalValores: totalValores ? numES(totalValores) : null,
+      efectivo: efectivo ? numES(efectivo) : null
+    };
+  }
+
+  function planCuadre(ex) {
+    const porIsin = new Map(Store.activos().filter(a => a.isin).map(a => [a.isin.toUpperCase(), a]));
+    const usados = new Set(Store.activos().map(a => (a.ticker || '').toUpperCase()));
+    const filas = ex.posiciones.map(p => {
+      const a = porIsin.get(p.isin);
+      const tengo = a ? Calc.posicion(a.id).titulos : 0;
+      const dif = p.titulos - tengo;
+      const f = { p, a, tengo, dif, cuadra: Math.abs(dif) < 0.000001 };
+      if (!a) Object.assign(f, tickerSugerido(p.nombre.replace(/\b(Ltd|Inc|Corp|N\.V|S\.A|AG|SE|plc|Registered|Shares)\.?\b/gi, ' '), usados), { tipo: /\b(ETF|UCITS|Acc|Dist)\b|\(Acc\)|\(Dist\)/i.test(p.nombre) ? 'etf' : 'accion' });
+      return f;
+    });
+    /* ¿Viene entero? Solo entonces tiene sentido avisar de lo que falta */
+    const completo = ex.declaradas === null || ex.declaradas === ex.posiciones.length;
+    const enIsins = new Set(ex.posiciones.map(p => p.isin));
+    const sobran = !completo ? [] : Store.activos().filter(a => {
+      if (!a.isin || enIsins.has(a.isin.toUpperCase())) return false;
+      const q = Calc.posicion(a.id);
+      return q.abierta && Store.ops().some(o => o.activoId === a.id && (o.cuenta || '') === ex.broker);
+    });
+    return { ex, filas, completo, sobran };
+  }
+
+  function cuadrar(txt, nombreArchivo) {
+    const ex = extractoPosiciones(txt);
+    if (!ex) { Util.toast('No reconozco este extracto', 'err'); return; }
+    const pl = planCuadre(ex);
+    const nuevos = pl.filas.filter(f => !f.a);
+    const desc = pl.filas.filter(f => f.a && !f.cuadra);
+    const ok = pl.filas.filter(f => f.a && f.cuadra);
+    const n = (x, d = 6) => Util.num(x, Math.abs(x) % 1 ? Math.min(d, 6) : 0);
+
+    Modal.abrir({
+      titulo: `Cuadrar con ${ex.broker}`, ancho: true,
+      cuerpo: `
+        <p class="small mut" style="margin:0 0 12px">${Util.esc(nombreArchivo || 'Extracto')} · lo que tenías el ${Util.fecha(ex.fecha)}</p>
+        <div class="imp-resumen">
+          <div class="imp-n si"><b>${pl.filas.length}</b><span>precios que se ponen al día, con fecha ${Util.fecha(ex.fecha)}</span></div>
+          ${ok.length ? `<div class="imp-n"><b>${ok.length}</b><span>cuadran: los mismos títulos aquí y en el bróker</span></div>` : ''}
+          ${desc.length ? `<div class="imp-n aviso"><b>${desc.length}</b><span>no cuadran: falta o sobra alguna operación</span></div>` : ''}
+          ${nuevos.length ? `<div class="imp-n aviso"><b>${nuevos.length}</b><span>no los tienes en la consola</span></div>` : ''}
+        </div>
+        ${!pl.completo ? `<ul class="motivos" style="margin-top:12px"><li class="media"><i class="sev"></i><div>
+          <b>El extracto está incompleto</b>
+          <p>Dice que tienes ${ex.declaradas} posiciones y solo trae ${ex.posiciones.length}. Se usa lo que hay, pero no puedo
+          saber si en la consola sobra algo. Si al pasar el PDF a CSV se perdieron páginas, vuelve a convertirlo entero.</p></div></li></ul>` : ''}
+
+        <div class="tbl-wrap" style="margin-top:12px"><table class="imp-fichas tbl-cuadre">
+          <thead><tr><th>Valor</th><th class="r">En el bróker</th><th class="r">En la consola</th><th class="r">Precio</th><th>Qué pasa</th></tr></thead>
+          <tbody>${pl.filas.map((f, i) => `<tr>
+            <td class="tick">${f.a ? Util.esc(f.a.ticker) + ' · ' : ''}${Util.esc(f.p.nombre)}<small>${Util.esc(f.p.isin)}</small></td>
+            <td class="r num" data-l="En el bróker">${n(f.p.titulos)}</td>
+            <td class="r num" data-l="En la consola">${f.a ? n(f.tengo) : '—'}</td>
+            <td class="r num" data-l="Precio">${Util.num(f.p.precio, 2)}${f.a && Util.n(f.a.cotizacion.precio) ? `<small>antes ${Util.num(f.a.cotizacion.precio, 2)}</small>` : ''}</td>
+            <td>${!f.a ? `<span class="pill reducir">nuevo</span><br>
+                  <input class="imp-tk" data-cq-tk="${i}" value="${Util.esc(f.ticker)}" style="margin-top:6px">
+                  <small class="${f.delCatalogo ? 'mut' : 'neg'}">${f.delCatalogo ? 'ticker de la lista' : 'ticker inventado: cámbialo si quieres'}</small>`
+              : f.cuadra ? '<span class="pill mantener">cuadra</span>'
+              : f.dif > 0 ? `<span class="pill reducir">faltan ${n(f.dif)}</span><small>falta apuntar alguna compra</small>`
+              : `<span class="pill vender">sobran ${n(-f.dif)}</span><small>falta apuntar alguna venta</small>`}</td>
+          </tr>`).join('')}</tbody></table></div>
+
+        ${pl.sobran.length ? `<ul class="motivos" style="margin-top:12px"><li class="alta"><i class="sev"></i><div>
+          <b>En la consola, pero no en el extracto</b>
+          <p>${pl.sobran.map(a => Util.esc(a.ticker)).join(', ')}: los tienes como posición abierta en ${Util.esc(ex.broker)},
+          pero el bróker ya no los lista. ¿Los vendiste? Importa los movimientos para que entre la venta.</p></div></li></ul>` : ''}
+
+        ${(desc.length || nuevos.length) ? `<p class="small mut" style="margin-top:12px">No invento compras ni ventas: sin su
+          precio, el coste y el informe fiscal saldrían mal. Lo que no cuadre quedará marcado en Cartera con un botón para
+          apuntar la operación con los títulos ya puestos. La forma más rápida: importar el historial completo de movimientos.</p>` : ''}
+
+        ${ex.efectivo !== null ? `<p class="small mut">Efectivo en la cuenta: ${Util.eur(ex.efectivo, 2)}. La consola sigue las
+          inversiones, no el dinero sin invertir, así que solo queda anotado.</p>` : ''}`,
+      pie: `<button class="btn" data-cerrar>Cancelar</button>
+            <button class="btn pri" id="cq-ok">Poner al día${nuevos.length ? ` y crear ${nuevos.length} ${nuevos.length === 1 ? 'ficha' : 'fichas'}` : ''}</button>`,
+      alAbrir: () => {
+        $$('[data-cq-tk]').forEach(i => i.addEventListener('input', () => { i.value = i.value.toUpperCase(); }));
+        $('#cq-ok').onclick = () => aplicarCuadre(pl);
+      }
+    });
+  }
+
+  function aplicarCuadre(pl) {
+    const ex = pl.ex;
+    const usados = new Set(Store.activos().map(a => (a.ticker || '').toUpperCase()));
+    for (let i = 0; i < pl.filas.length; i++) {
+      const f = pl.filas[i];
+      if (f.a) continue;
+      const t = (($(`[data-cq-tk="${i}"]`) || {}).value || '').trim().toUpperCase();
+      if (!t) { Util.toast(`Falta el ticker de ${f.p.nombre}`, 'err'); return; }
+      if (usados.has(t)) { Util.toast(`Ya tienes otro valor con el ticker ${t}: elige otro`, 'err'); $(`[data-cq-tk="${i}"]`).focus(); return; }
+      usados.add(t); f.ticker = t;
+    }
+    Store.marcar(`Cuadrar con ${ex.broker} (${ex.fecha})`);
+    let precios = 0, fichas = 0;
+    pl.filas.forEach(f => {
+      let a = f.a;
+      if (!a) {
+        a = Store.normalizar({ activos: [{
+          id: Util.uid('ac'), ticker: f.ticker, nombre: f.p.nombre, isin: f.p.isin, tipo: f.tipo,
+          estado: 'cartera', divisa: 'EUR', fx: 1, cotizacion: { precio: 0, fecha: '' },
+          notas: `Creada al cuadrar con ${ex.broker} el ${Util.hoy()}${f.p.custodia ? ` · custodia: ${f.p.custodia}` : ''}.`
+        }] }).activos[0];
+        Store.activos().push(a); fichas++;
+      }
+      /* El precio de hoy, y además como toma con fecha: así entra en las curvas */
+      if (!a.cotizacion.fecha || ex.fecha >= a.cotizacion.fecha) {
+        if (Util.n(a.cotizacion.precio) !== f.p.precio) Store.log(a, 'Precio', a.cotizacion.precio, f.p.precio);
+        a.cotizacion.precio = f.p.precio; a.cotizacion.fecha = ex.fecha;
+      }
+      const j = a.serie.findIndex(t => t.fecha === ex.fecha);
+      if (j >= 0) { if (a.serie[j].precio === undefined) a.serie[j].precio = f.p.precio; }
+      else a.serie.push({ id: Util.uid('tm'), fecha: ex.fecha, precio: f.p.precio, fuente: `Extracto de ${ex.broker}` });
+      a.serie.sort((x, y) => (x.fecha || '').localeCompare(y.fecha || ''));
+      /* Lo que dice el bróker, para poder marcar el descuadre en Cartera */
+      a.cuadre = { fecha: ex.fecha, titulos: f.p.titulos, cuenta: ex.broker };
+      if (a.estado !== 'cartera') a.estado = 'cartera';
+      precios++;
+    });
+    Store.save();
+    Modal.cerrar();
+    Util.toast(`${precios} precios al día${fichas ? ` y ${fichas} fichas nuevas` : ''}. Se puede deshacer desde el aviso de arriba.`);
+  }
+
+  const esExtracto = txt => !!extractoPosiciones(txt);
+
+  /* Un solo punto de entrada: movimientos o patrimonio, lo que sea */
+  function abrir(txt, nombre) {
+    if (lectorDe(txt)) return importar(txt, nombre);
+    if (esExtracto(txt)) return cuadrar(txt, nombre);
+    Util.toast('No reconozco este archivo como un extracto de bróker', 'err');
+  }
+  function elegirArchivo() {
+    Util.leerArchivo('.csv,.txt', (txt, nombre) => abrir(txt, nombre));
+  }
+
+  return { reconoce, abrir, importar, cuadrar, elegirArchivo, leerCSV, lectorDe, planificar, extractoPosiciones, planCuadre, LECTORES };
 })();
