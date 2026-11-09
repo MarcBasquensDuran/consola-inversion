@@ -94,7 +94,7 @@ const Agenda = (() => {
       const donde = a.estado === 'cartera' ? 'en cartera' : 'en vigilancia';
 
       añade('revision', a.seguimiento && a.seguimiento.proximaRevision,
-        `Revisar ${a.ticker}`,
+        `Revisar ${Util.nombreDe(a)}`,
         `${a.nombre} · ${donde}${p.abierta ? ` · ${Util.num(p.titulos, 0)} títulos` : ''}\n\n` +
         `Abre la ficha, mira el semáforo y registra la revisión aunque decidas no hacer nada.`,
         a.id);
@@ -103,7 +103,7 @@ const Agenda = (() => {
         if (h.estado === 'rota' || !h.plazo) return;
         const corto = h.texto.length > 52 ? h.texto.slice(0, 52).trim() + '…' : h.texto;
         añade('hipotesis', h.plazo,
-          `${a.ticker} · vence: ${corto}`,
+          `${Util.nombreDe(a)} · vence: ${corto}`,
           `${a.nombre}\n\nHipótesis: ${h.texto}\n` +
           `Se mide con: ${h.metrica || 'sin métrica anotada'}\n` +
           `Esperabas: ${h.esperado || 'sin valor anotado'}\n` +

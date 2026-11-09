@@ -231,6 +231,8 @@ td.r,th.r{text-align:right}
 tfoot td{font-weight:640;background:var(--c-surface-2);border-top:2px solid var(--c-border-strong)}
 .tick{font-weight:650;letter-spacing:-.01em}
 .tick small{display:block;font-weight:440;color:var(--c-muted);font-size:11.5px;letter-spacing:0}
+td.num{white-space:nowrap}
+.tk-mini{font-size:11px;font-weight:500;color:var(--c-muted);letter-spacing:.02em;margin-left:4px}
 td input,td select{padding:4px 7px;font-size:12.5px}
 .pos{color:var(--v-mantener)} .neg{color:var(--v-vender)}
 
@@ -1489,6 +1491,35 @@ const Util = (() => {
   const dias = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
   const esc = t => String(t ?? '').replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  /* El nombre para leer, que es lo que se recuerda: el de la empresa sin
+     «S.A.», «Inc.» y compañía, y recortado si no cabe (en gráficos).
+     Sirve con una ficha o con un ticker suelto (papel, cribado, catálogo). */
+  const SUFIJO = /[,\s]+(S\.?\s?A\.?\s?U?\.?|S\.?L\.?|SOCIMI|Inc\.?|Corp\.?|Corporation|Ltd\.?|plc|N\.?V\.?|SE|AG|S\.?p\.?A\.?|Co\.?|Class [A-C]|Registered Shares|Shares)$/i;
+  function limpio(nb) {
+    let t = String(nb || '').trim(), antes;
+    do { antes = t; t = t.replace(SUFIJO, '').trim(); } while (t && t !== antes);
+    return t || String(nb || '').trim();
+  }
+  const recorta = (t, max) => max && t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t;
+  function nombreDe(x, max) {
+    let nb = '';
+    if (x && typeof x === 'object') nb = x.nombre || x.ticker || '';
+    else {
+      const tk = String(x || '').toUpperCase();
+      if (!tk) return '—';
+      let a = null, v = null, u = null;
+      try { a = Store.activos().find(y => (y.ticker || '').toUpperCase() === tk); } catch (e) {}
+      if (!a && typeof VALORES !== 'undefined') v = VALORES.exacto(tk);
+      if (!a && !v) try { u = Store.universo().find(y => (y.ticker || '').toUpperCase() === tk); } catch (e) {}
+      nb = (a && a.nombre) || (v && v.nombre) || (u && u.nombre) || tk;
+    }
+    return recorta(limpio(nb), max);
+  }
+  /* Para una celda: el nombre arriba y el ticker pequeño debajo */
+  const nt = (x, extra) => {
+    const tk = x && typeof x === 'object' ? x.ticker : x;
+    return `${esc(nombreDe(x))}<small>${esc(String(tk || '').toUpperCase())}${extra ? ' · ' + extra : ''}</small>`;
+  };
   const bytes = b => b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(1) + ' kB' : (b / 1048576).toFixed(2) + ' MB';
 
   function toast(msg, kind = '') {
@@ -1526,7 +1557,7 @@ const Util = (() => {
     return { dias: d, clase: d <= u ? 'fresco' : d <= u * 3 ? 'viejo' : 'muy-viejo', texto,
       titulo: `Precio del ${fecha(fechaPrecio)}: ${d} ${d === 1 ? 'día' : 'días'} de bolsa${d > u ? ` (más de ${u}: conviene actualizarlo)` : ''}` };
   }
-  return { $, $$, uid, hoy, n, eur, num, pct, signo, fecha, dias, diasHabiles, frescura, esc, bytes, toast, bajar, leerArchivo };
+  return { $, $$, uid, hoy, n, eur, num, pct, signo, fecha, dias, diasHabiles, frescura, esc, bytes, toast, bajar, leerArchivo, nombreDe, nt };
 })();
 const { $, $$ } = Util;
 
@@ -2605,22 +2636,22 @@ const Store = (() => {
       const fecha = d.fecha || Util.hoy();
       const previa = (ex.serie || []).find(t => t.fecha === fecha);
       const campos = METRICAS.filter(m => d[m.k] !== undefined && d[m.k] !== null && d[m.k] !== '');
-      if (ex._nuevo) { anota('Toma', ex.ticker, `Primera toma, del ${Util.fecha(fecha)}, con ${campos.length} ${campos.length === 1 ? 'indicador' : 'indicadores'}`); return; }
+      if (ex._nuevo) { anota('Toma', Util.nombreDe(ex), `Primera toma, del ${Util.fecha(fecha)}, con ${campos.length} ${campos.length === 1 ? 'indicador' : 'indicadores'}`); return; }
       if (previa) {
         const choque = campos.filter(m => previa[m.k] !== undefined && Math.abs(Util.n(previa[m.k]) - Util.n(d[m.k])) > 0.0001);
         const nuevos = campos.filter(m => previa[m.k] === undefined);
-        if (nuevos.length) anota('Toma', ex.ticker, `Se ${nuevos.length === 1 ? 'completa un indicador' : 'completan ' + nuevos.length + ' indicadores'} de la toma del ${Util.fecha(fecha)}`, 'cambia');
-        choque.forEach(m => avisos.push(`${ex.ticker}: la toma del ${Util.fecha(fecha)} ya tiene ${m.n} = ${Util.num(previa[m.k], m.dec)} y el paquete trae ${Util.num(d[m.k], m.dec)}. Se conserva el tuyo.`));
-        if (!nuevos.length && !choque.length) anota('Toma', ex.ticker, `La toma del ${Util.fecha(fecha)} ya estaba, sin nada que añadir`, 'igual');
+        if (nuevos.length) anota('Toma', Util.nombreDe(ex), `Se ${nuevos.length === 1 ? 'completa un indicador' : 'completan ' + nuevos.length + ' indicadores'} de la toma del ${Util.fecha(fecha)}`, 'cambia');
+        choque.forEach(m => avisos.push(`${Util.nombreDe(ex)}: la toma del ${Util.fecha(fecha)} ya tiene ${m.n} = ${Util.num(previa[m.k], m.dec)} y el paquete trae ${Util.num(d[m.k], m.dec)}. Se conserva el tuyo.`));
+        if (!nuevos.length && !choque.length) anota('Toma', Util.nombreDe(ex), `La toma del ${Util.fecha(fecha)} ya estaba, sin nada que añadir`, 'igual');
       } else {
-        anota('Toma', ex.ticker, `Toma nueva del ${Util.fecha(fecha)} con ${campos.length} ${campos.length === 1 ? 'indicador' : 'indicadores'}${d.precio ? ` · precio ${Util.num(d.precio)} (tenías ${Util.num(ex.cotizacion.precio)})` : ''}`);
+        anota('Toma', Util.nombreDe(ex), `Toma nueva del ${Util.fecha(fecha)} con ${campos.length} ${campos.length === 1 ? 'indicador' : 'indicadores'}${d.precio ? ` · precio ${Util.num(d.precio)} (tenías ${Util.num(ex.cotizacion.precio)})` : ''}`);
       }
     });
 
     (paquete.fundamentales || []).forEach(f => {
       const ex = porTk(f.ticker); if (!ex || !f.periodo) return;
       const hay = !ex._nuevo && ex.fundamentales.some(x => x.periodo === f.periodo);
-      anota('Cifras', ex.ticker, `Ejercicio ${f.periodo}${hay ? ': se actualiza la fila que ya existe' : ': fila nueva'}`, hay ? 'cambia' : 'nuevo');
+      anota('Cifras', Util.nombreDe(ex), `Ejercicio ${f.periodo}${hay ? ': se actualiza la fila que ya existe' : ': fila nueva'}`, hay ? 'cambia' : 'nuevo');
     });
 
     (paquete.hipotesis || []).forEach(h => {
@@ -2628,21 +2659,21 @@ const Store = (() => {
       if (ex._nuevo) return;
       const dest = ex.tesis.hipotesis.find(x => x.id === h.id) ||
         ex.tesis.hipotesis.find(x => h.texto && x.texto.toLowerCase().includes(String(h.texto).toLowerCase().slice(0, 25)));
-      if (!dest) { avisos.push(`${ex.ticker}: el paquete trae evidencia sobre «${h.texto}», que no encaja con ninguna hipótesis tuya.`); return; }
+      if (!dest) { avisos.push(`${Util.nombreDe(ex)}: el paquete trae evidencia sobre «${h.texto}», que no encaja con ninguna hipótesis tuya.`); return; }
       const partes = [];
       if (h.evidencia) partes.push('evidencia nueva');
       if (h.estadoSugerido && h.estadoSugerido !== dest.estado)
         partes.push(`sugerencia de marcarla como ${(ESTADOS_HIPO[h.estadoSugerido] || h.estadoSugerido).toLowerCase()}, ahora la tienes como ${ESTADOS_HIPO[dest.estado].toLowerCase()}`);
-      if (partes.length) anota('Hipótesis', ex.ticker, `«${dest.texto}»: ${partes.join(' y ')}`, 'cambia');
+      if (partes.length) anota('Hipótesis', Util.nombreDe(ex), `«${dest.texto}»: ${partes.join(' y ')}`, 'cambia');
     });
 
     (paquete.estudios || []).forEach(es => {
       const ex = es.activoId ? state.activos.find(x => x.id === es.activoId) : porTk(es.ticker);
       if (!ex) { if (es.ticker && !desconocidos.includes(es.ticker)) desconocidos.push(es.ticker); return; }
       const n = (es.secciones || []).length;
-      anota('Estudio', ex.ticker, `«${es.titular}»${n ? ` · ${n} apartados` : ''}`, 'nuevo');
+      anota('Estudio', Util.nombreDe(ex), `«${es.titular}»${n ? ` · ${n} apartados` : ''}`, 'nuevo');
       const previos = ex._nuevo ? 0 : (ex.estudios || []).filter(x => !x.fijado).length;
-      if (previos >= 8) avisos.push(`${ex.ticker}: ya tienes ocho estudios guardados, así que al entrar este se irá el más antiguo. Fija los que quieras conservar.`);
+      if (previos >= 8) avisos.push(`${Util.nombreDe(ex)}: ya tienes ocho estudios guardados, así que al entrar este se irá el más antiguo. Fija los que quieras conservar.`);
     });
 
     (paquete.noticias || []).forEach(n => {
@@ -2650,13 +2681,13 @@ const Store = (() => {
       if (!ex) { if (n.ticker && !desconocidos.includes(n.ticker)) desconocidos.push(n.ticker); return; }
       const dup = state.noticias.some(x => x.id === n.id || (x.activoId === ex.id && x.fecha === n.fecha && x.titular === n.titular));
       if (dup) return;
-      anota('Novedad', ex.ticker, `${n.impacto === 'alto' ? 'Impacto alto · ' : ''}${n.titular}`, n.impacto === 'alto' ? 'cambia' : 'nuevo');
+      anota('Novedad', Util.nombreDe(ex), `${n.impacto === 'alto' ? 'Impacto alto · ' : ''}${n.titular}`, n.impacto === 'alto' ? 'cambia' : 'nuevo');
     });
 
     (paquete.operaciones || []).forEach(o => {
       if (state.operaciones.some(x => x.id === o.id)) return;
       const ex = state.activos.find(x => x.id === o.activoId);
-      anota('Operación', ex ? ex.ticker : '—', `${o.tipo} del ${Util.fecha(o.fecha)}`);
+      anota('Operación', ex ? Util.nombreDe(ex) : '—', `${o.tipo} del ${Util.fecha(o.fecha)}`);
     });
 
     (paquete.manual || []).forEach(m => {
@@ -3313,7 +3344,7 @@ const Calc = (() => {
     /* Una posición sin histórico se valora a coste hasta que aparece su primer
        precio, y ese día pega un salto que no es rentabilidad, es falta de datos. */
     const sinHistorico = Store.activos().filter(a => posicion(a.id).abierta && (a.serie || []).length < 3)
-      .map(a => a.ticker);
+      .map(a => Util.nombreDe(a));
 
     let twr = 1, idx = 1, titulosRef = 0, invertidoRef = 0;
     const puntos = [];
@@ -3826,6 +3857,18 @@ const Graf = (() => {
   const vacio = t => `<div class="vacio"><b>Sin datos todavía</b>${E(t)}</div>`;
   const leyenda = items => `<div class="leyenda">${items.map(i =>
     `<span><i style="background:${i.color}"></i>${E(i.nombre)}</span>`).join('')}</div>`;
+  /* Margen izquierdo a la medida de las etiquetas: con nombres de empresa en
+     vez de tickers, un hueco fijo los cortaba por delante. Como mucho un 40 %
+     del ancho; lo que no quepa se recorta con «…» (el nombre entero sigue en
+     el aviso al pasar por encima). */
+  function izquierda(etiquetas, W) {
+    const fs = F(11.5), porLetra = fs * 0.6;
+    const minimo = movil() ? 78 : 96, maximo = Math.round(W * 0.4);
+    const largo = Math.max(0, ...etiquetas.map(e => String(e || '').length));
+    const l = Math.max(minimo, Math.min(maximo, Math.ceil(largo * porLetra) + 14));
+    const caben = Math.max(4, Math.floor((l - 14) / porLetra));
+    return { l, et: e => { e = String(e ?? ''); return e.length > caben ? e.slice(0, caben - 1).trimEnd() + '…' : e; } };
+  }
   const eje = (x1, x2, y) => `<line x1="${x1}" x2="${x2}" y1="${y}" y2="${y}" stroke="var(--g-eje)" stroke-width="1"/>`;
 
   /* Líneas con eje temporal categórico */
@@ -3902,7 +3945,7 @@ const Graf = (() => {
   function barrasH(datos, o) {
     o = o || {};
     if (!datos.length) return vacio(o.vacio || 'Nada que representar.');
-    const W = anchoUtil(), fila = movil() ? 30 : 26, P = { t: 10, r: movil() ? 64 : 58, b: 22, l: movil() ? 78 : 96 };
+    const W = anchoUtil(), fila = movil() ? 30 : 26, iz = izquierda(datos.map(d => d.e), W), P = { t: 10, r: movil() ? 64 : 58, b: 22, l: iz.l };
     const H = P.t + P.b + datos.length * fila;
     const max = Math.max(o.ref || 0, ...datos.map(d => Math.abs(d.v))) * 1.12 || 1;
     const ancho = W - P.l - P.r;
@@ -3913,7 +3956,7 @@ const Graf = (() => {
       ${datos.map((d, i) => {
         const yy = P.t + i * fila, w = Math.abs(d.v) / max * ancho;
         const col = d.color || PAL[i % PAL.length];
-        return `<text x="${P.l - 8}" y="${yy + 14}" text-anchor="end" font-size="${F(11.5)}" fill="var(--c-ink)" font-weight="600">${E(d.e)}</text>
+        return `<text x="${P.l - 8}" y="${yy + 14}" text-anchor="end" font-size="${F(11.5)}" fill="var(--c-ink)" font-weight="600">${E(iz.et(d.e))}<title>${E(d.e)}</title></text>
           <rect x="${P.l}" y="${yy + 4}" width="${w.toFixed(1)}" height="15" rx="2.5" fill="${col}"><title>${E(d.e)} · ${E(o.fmt ? o.fmt(d.v) : Util.num(d.v, 1))}</title></rect>
           <text x="${P.l + w + 6}" y="${yy + 16}" font-size="${F(11)}" fill="var(--c-ink-soft)">${E(o.fmt ? o.fmt(d.v) : Util.num(d.v, 1))}</text>`;
       }).join('')}
@@ -3924,7 +3967,7 @@ const Graf = (() => {
   function divergente(datos, o) {
     o = o || {};
     if (!datos.length) return vacio(o.vacio || 'Nada que representar.');
-    const W = anchoUtil(), fila = movil() ? 30 : 26, P = { t: 10, r: 16, b: 22, l: movil() ? 78 : 96 };
+    const W = anchoUtil(), fila = movil() ? 30 : 26, iz = izquierda(datos.map(d => d.e), W), P = { t: 10, r: 16, b: 22, l: iz.l };
     const H = P.t + P.b + datos.length * fila;
     const max = Math.max(...datos.map(d => Math.abs(d.v))) * 1.2 || 1;
     const medio = P.l + (W - P.l - P.r) / 2, semi = (W - P.l - P.r) / 2;
@@ -3932,7 +3975,7 @@ const Graf = (() => {
       ${datos.map((d, i) => {
         const yy = P.t + i * fila, w = Math.abs(d.v) / max * semi;
         const pos = d.v >= 0;
-        return `<text x="${P.l - 8}" y="${yy + 14}" text-anchor="end" font-size="${F(11.5)}" fill="var(--c-ink)" font-weight="600">${E(d.e)}</text>
+        return `<text x="${P.l - 8}" y="${yy + 14}" text-anchor="end" font-size="${F(11.5)}" fill="var(--c-ink)" font-weight="600">${E(iz.et(d.e))}<title>${E(d.e)}</title></text>
           <rect x="${pos ? medio : medio - w}" y="${yy + 4}" width="${w.toFixed(1)}" height="15" rx="2.5"
             fill="${pos ? 'var(--v-mantener)' : 'var(--v-vender)'}"><title>${E(d.e)} · ${E(o.fmt ? o.fmt(d.v) : Util.signo(d.v))}</title></rect>
           <text x="${pos ? medio + w + 6 : medio - w - 6}" y="${yy + 16}" text-anchor="${pos ? 'start' : 'end'}"
@@ -4022,14 +4065,14 @@ const Graf = (() => {
   /* Barras apiladas por fila */
   function apiladas(filas, cats) {
     if (!filas.length) return vacio('Nada que representar.');
-    const W = anchoUtil(), fila = movil() ? 30 : 26, P = { t: 10, r: 16, b: 22, l: movil() ? 78 : 96 };
+    const W = anchoUtil(), fila = movil() ? 30 : 26, iz = izquierda(filas.map(f => f.e), W), P = { t: 10, r: 16, b: 22, l: iz.l };
     const H = P.t + P.b + filas.length * fila;
     const ancho = W - P.l - P.r;
     return svg(W, H, filas.map((f, i) => {
       const total = f.partes.reduce((s, p) => s + p.v, 0) || 1;
       let acum = 0;
       const yy = P.t + i * fila;
-      return `<text x="${P.l - 8}" y="${yy + 14}" text-anchor="end" font-size="${F(11.5)}" fill="var(--c-ink)" font-weight="600">${E(f.e)}</text>` +
+      return `<text x="${P.l - 8}" y="${yy + 14}" text-anchor="end" font-size="${F(11.5)}" fill="var(--c-ink)" font-weight="600">${E(iz.et(f.e))}<title>${E(f.e)}</title></text>` +
         f.partes.map(p => {
           const w = p.v / total * ancho, xx = P.l + acum; acum += w;
           return p.v ? `<rect x="${xx.toFixed(1)}" y="${yy + 4}" width="${w.toFixed(1)}" height="15" fill="${p.color}" stroke="var(--c-surface)" stroke-width="1"><title>${E(f.e)} · ${E(p.nombre)}: ${p.v}</title></rect>` : '';
@@ -4040,13 +4083,13 @@ const Graf = (() => {
   /* Rango con marca: dónde está hoy dentro de su propio recorrido */
   function rangos(datos) {
     if (!datos.length) return vacio('Hacen falta al menos tres tomas de un múltiplo para situar el dato de hoy.');
-    const W = anchoUtil(), fila = 34, P = { t: 12, r: 60, b: 16, l: movil() ? 78 : 96 };
+    const W = anchoUtil(), fila = 34, iz = izquierda(datos.map(d => d.e), W), P = { t: 12, r: 60, b: 16, l: iz.l };
     const H = P.t + P.b + datos.length * fila;
     const ancho = W - P.l - P.r;
     return svg(W, H, datos.map((d, i) => {
       const yy = P.t + i * fila + 12;
       const esc = v => P.l + (v - d.min) / ((d.max - d.min) || 1) * ancho;
-      return `<text x="${P.l - 8}" y="${yy + 4}" text-anchor="end" font-size="${F(11.5)}" font-weight="600" fill="var(--c-ink)">${E(d.e)}</text>
+      return `<text x="${P.l - 8}" y="${yy + 4}" text-anchor="end" font-size="${F(11.5)}" font-weight="600" fill="var(--c-ink)">${E(iz.et(d.e))}<title>${E(d.e)}</title></text>
         <line x1="${P.l}" x2="${W - P.r}" y1="${yy}" y2="${yy}" stroke="var(--c-border-strong)" stroke-width="5" stroke-linecap="round"/>
         <line x1="${esc(d.mediana).toFixed(1)}" x2="${esc(d.mediana).toFixed(1)}" y1="${yy - 9}" y2="${yy + 9}" stroke="var(--c-ink-soft)" stroke-width="1.5"/>
         <circle cx="${esc(d.actual).toFixed(1)}" cy="${yy}" r="6"
@@ -4358,7 +4401,7 @@ const Vistas = (() => {
         return `<div class="veredicto ${v.accion}${abiertos.has(a.id) ? ' abierto' : ''}" data-id="${a.id}">
           <div class="ver-h" data-toggle="${a.id}">
             <div class="ver-id">
-              <div class="t">${Util.esc(a.ticker)} · ${Util.esc(a.nombre)}</div>
+              <div class="t">${Util.esc(Util.nombreDe(a))} <span class=\"tk-mini\">${Util.esc(a.ticker)}</span></div>
               <div class="s">${TIPOS[a.tipo]} · ${Util.esc(a.sector || '—')}${vig ? ' · en vigilancia' : ''} · ${v.motivos.length} ${v.motivos.length === 1 ? 'aviso' : 'avisos'}</div>
               ${(() => { const e = (a.estudios || [])[0]; return e ? `<div class="titular ${e.leido ? '' : 'nuevo'}">
                 ${e.leido ? '' : '<i></i>'}${Util.esc(e.titular)}<time>${Util.fecha(e.fecha)}</time></div>` : ''; })()}
@@ -4439,10 +4482,10 @@ const Vistas = (() => {
           <b>${pendientes.length === 1 ? 'Un valor no cuadra' : `${pendientes.length} valores no cuadran`}</b>
           <p>Hasta que se apunte lo que falta, sus títulos, su coste y el informe fiscal no son fiables.</p>
           <div class="cuadres">${pendientes.map(x => x.sinCompra ? `
-            <div class="cuadre"><span><b>${Util.esc(x.a.ticker)}</b> · en cartera, pero sin ninguna compra apuntada</span>
+            <div class="cuadre"><span><b>${Util.esc(Util.nombreDe(x.a))}</b> · en cartera, pero sin ninguna compra apuntada</span>
               <span class="btns"><button class="btn mini" data-huerfano="${x.a.id}">Apuntar la compra</button>
               <button class="btn mini" data-avigilancia="${x.a.id}">Pasar a vigilancia</button></span></div>` : `
-            <div class="cuadre"><span><b>${Util.esc(x.a.ticker)}</b> · ${Util.esc(x.cuenta || 'el bróker')} dice ${nf(x.broker)} el ${Util.fecha(x.fecha)};
+            <div class="cuadre"><span><b>${Util.esc(Util.nombreDe(x.a))}</b> · ${Util.esc(x.cuenta || 'el bróker')} dice ${nf(x.broker)} el ${Util.fecha(x.fecha)};
               aquí ${nf(x.aqui)}. ${x.dif > 0 ? `Falta una compra de ${nf(x.dif)}` : `Falta una venta de ${nf(-x.dif)}`}.</span>
               <span class="btns"><button class="btn mini" data-cuadrar="${x.a.id}" data-cq-tipo="${x.dif > 0 ? 'compra' : 'venta'}" data-cq-tit="${Math.abs(x.dif)}">
                 Apuntar la ${x.dif > 0 ? 'compra' : 'venta'} de ${nf(Math.abs(x.dif))}</button>
@@ -4461,7 +4504,7 @@ const Vistas = (() => {
           const a = f.a, p = f.p, m = Calc.margen(a);
           const v = Motor.evaluar(a, c);
           return `<tr>
-            <td class="tick">${Util.esc(a.ticker)}<small>${Util.esc(a.nombre)}</small>
+            <td class="tick">${Util.nt(a)}
               ${(() => { const e = (a.estudios || [])[0]; return e ? `<div class="titular ${e.leido ? '' : 'nuevo'}" title="${Util.esc(e.resumen || '')}">
                 ${e.leido ? '' : '<i></i>'}${Util.esc(e.titular)}
                 <time>${Util.fecha(e.fecha)}</time></div>` : ''; })()}</td>
@@ -4478,7 +4521,7 @@ const Vistas = (() => {
             <td><span class="pill ${v.accion}">${ACCIONES[v.accion]}</span></td>
             <td class="no-print nowrap"><button class="btn mini" data-ficha2="${a.id}">Ficha</button>
               <button class="btn mini" data-sim2="${a.id}">${a.tipo === 'bono' ? 'Vencimiento' : 'Vender'}</button>
-              <button class="btn mini" data-enl="${a.id}" title="Cotización, noticias y documentos de ${Util.esc(a.ticker)}">↗</button></td>
+              <button class="btn mini" data-enl="${a.id}" title="Cotización, noticias y documentos de ${Util.esc(Util.nombreDe(a))}">↗</button></td>
           </tr>`;
         }).join('')}</tbody>
         <tfoot><tr>
@@ -4561,8 +4604,8 @@ const Vistas = (() => {
       datos.sort((x, y) => {
         if (orden === 'nota' && sel.length) return (y.nota || 0) - (x.nota || 0);
         if (orden === 'margen') return (y.margen === null ? -1e9 : y.margen) - (x.margen === null ? -1e9 : x.margen);
-        if (orden === 'ticker') return (x.a.ticker || '').localeCompare(y.a.ticker || '');
-        return (y.a.interes - x.a.interes) || (x.a.ticker || '').localeCompare(y.a.ticker || '');
+        if (orden === 'ticker') return Util.nombreDe(x.a).localeCompare(Util.nombreDe(y.a), 'es');
+        return (y.a.interes - x.a.interes) || Util.nombreDe(x.a).localeCompare(Util.nombreDe(y.a), 'es');
       });
 
       const porNota = sel.length > 0;
@@ -4608,7 +4651,7 @@ const Vistas = (() => {
           const vs = porNota ? Math.max(0, Math.min(1, (d.nota || 0) / 100))
             : (datos.length > 1 ? (datos.length - 1 - i) / (datos.length - 1) : 1);
           return `<tr class="vg ${porNota ? 'por-nota' : ''} ${porNota && d.falla ? 'falla' : ''}" style="--vs:${vs.toFixed(3)}">
-            <td class="tick">${Util.esc(a.ticker)}<small>${Util.esc(a.nombre)}</small></td>
+            <td class="tick">${Util.nt(a)}</td>
             <td><span class="pill tipo t-${a.tipo}">${TIPOS[a.tipo]}</span></td>
             <td class="r"><div class="megusta">
               <button class="btn mini" data-vmenos="${a.id}" title="Menos">−</button>
@@ -4625,7 +4668,7 @@ const Vistas = (() => {
               <button class="btn mini" data-comprar="${a.id}">Comprar</button>
               <button class="btn mini btn-papel" data-probar="${a.id}" title="Comprarla con dinero imaginario en una cartera de papel">Probar en papel</button>
               <button class="btn mini" data-quitarvig="${a.id}">Quitar</button>
-              <button class="btn mini" data-enl="${a.id}" title="Cotización, noticias y documentos de ${Util.esc(a.ticker)}">↗</button></td>
+              <button class="btn mini" data-enl="${a.id}" title="Cotización, noticias y documentos de ${Util.esc(Util.nombreDe(a))}">↗</button></td>
           </tr>`;
         }).join('') : `<tr><td colspan="${col + 1}" class="vacio"><b>Nada en vigilancia todavía</b>Añade un activo y déjalo «en vigilancia», o pásalo desde el cribado.</td></tr>`}</tbody>`;
 
@@ -4694,15 +4737,15 @@ const Vistas = (() => {
       });
       $$('[data-cq-olvidar]').forEach(b => b.onclick = () => {
         const a = Store.activo(b.dataset.cqOlvidar);
-        Store.marcar(`Olvidar el descuadre de ${a.ticker}`);
+        Store.marcar(`Olvidar el descuadre de ${Util.nombreDe(a)}`);
         delete a.cuadre; Store.save();
       });
       $$('[data-avigilancia]').forEach(b => b.onclick = () => {
         const a = Store.activo(b.dataset.avigilancia);
-        Store.marcar(`${a.ticker} a vigilancia`);
+        Store.marcar(`${Util.nombreDe(a)} a vigilancia`);
         Store.log(a, 'Estado', 'cartera', 'vigilancia');
         a.estado = 'vigilancia';
-        Store.save(); Util.toast(`${a.ticker} pasa a vigilancia`);
+        Store.save(); Util.toast(`${Util.nombreDe(a)} pasa a vigilancia`);
       });
     }
 
@@ -4719,7 +4762,7 @@ const Vistas = (() => {
           ops && `${ops} operaciones`
         ].filter(Boolean);
         Modal.abrir({
-          titulo: `Quitar ${a.ticker} de vigilancia`,
+          titulo: `Quitar ${Util.nombreDe(a)} de vigilancia`,
           cuerpo: `<p>Deja de seguir <b>${Util.esc(a.nombre)}</b> y borra su ficha.</p>
             ${cosas.length ? `<ul class="motivos" style="margin-top:12px"><li class="alta"><i class="sev"></i><div>
               <b>Se lleva por delante lo que tienes apuntado</b>
@@ -4727,12 +4770,12 @@ const Vistas = (() => {
             <p class="small mut" style="margin-top:12px">Se puede deshacer desde el aviso de arriba justo después.</p>`,
           pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn pri" id="qv-ok">Quitar de vigilancia</button>`,
           alAbrir: () => $('#qv-ok').onclick = () => {
-            Store.marcar(`Quitar ${a.ticker} de vigilancia`);
+            Store.marcar(`Quitar ${Util.nombreDe(a)} de vigilancia`);
             const acts = Store.activos();
             acts.splice(acts.findIndex(x => x.id === a.id), 1);
             const ops2 = Store.ops();
             for (let i = ops2.length - 1; i >= 0; i--) if (ops2[i].activoId === a.id) ops2.splice(i, 1);
-            Store.save(); Modal.cerrar(); Util.toast(`${a.ticker} fuera de la lista`);
+            Store.save(); Modal.cerrar(); Util.toast(`${Util.nombreDe(a)} fuera de la lista`);
           }
         });
     }
@@ -4832,7 +4875,7 @@ const Vistas = (() => {
         <tbody>${datos.length ? datos.slice(0, 400).map(d => {
           const e = d.e;
           return `<tr>
-            <td class="tick">${Util.esc(e.ticker)}<small>${Util.esc(e.nombre || '')}</small></td>
+            <td class="tick">${Util.nt(e)}</td>
             <td class="small soft">${Util.esc(e.sector || '—')}</td>
             <td class="r num">${isFinite(e.capitalizacion) ? Util.num(e.capitalizacion / 1e6, 0) + ' M' : '—'}</td>
             ${sel.map(f => {
@@ -4902,7 +4945,7 @@ const Vistas = (() => {
       const sel = Store.filtros().filter(f => activos().has(f.id));
       const lista = sel.length ? sel : Store.filtros();
       Modal.abrir({
-        titulo: `${e.ticker} · ${e.nombre || ''}`, ancho: true,
+        titulo: `${Util.nombreDe(e)} · ${e.ticker}`, ancho: true,
         cuerpo: `
           <div class="toolbar small mut" style="margin-bottom:14px">
             <span>${Util.esc(e.sector || '—')}</span><span>· ${Util.esc(e.pais || '—')}</span>
@@ -4933,7 +4976,7 @@ const Vistas = (() => {
     function aVigilancia(id) {
       const e = Store.universo().find(x => x.id === id);
       if (Store.activos().some(a => a.ticker.toUpperCase() === e.ticker)) {
-        Util.toast(e.ticker + ' ya está en tu cartera o vigilancia', 'err'); return;
+        Util.toast(Util.nombreDe(e) + ' ya está en tu cartera o vigilancia', 'err'); return;
       }
       const toma = { id: Util.uid('tm'), fecha: e.fecha || Util.hoy(), fuente: e.fuente || 'cribado' };
       METRICAS.forEach(m => { if (isFinite(e[m.k])) toma[m.k] = e[m.k]; });
@@ -4949,7 +4992,7 @@ const Vistas = (() => {
       }] }).activos[0];
       Store.activos().push(nuevo);
       Store.save();
-      Util.toast(e.ticker + ' pasa a vigilancia con sus datos');
+      Util.toast(Util.nombreDe(e) + ' pasa a vigilancia con sus datos');
     }
 
     /* ---- Importar ---- */
@@ -5711,7 +5754,7 @@ const Vistas = (() => {
           const imp = o.tipo === 'dividendo' || o.tipo === 'comision' ? o.importe : o.titulos * o.precio;
           return `<tr>
             <td class="nowrap">${Util.fecha(o.fecha)}</td>
-            <td class="tick">${a ? Util.esc(a.ticker) : '—'}</td>
+            <td class=\"tick\">${a ? Util.nt(a) : '—'}</td>
             <td><span class="pill neutro">${ETI[o.tipo]}</span></td>
             <td class="r num">${o.titulos ? Util.num(o.titulos, o.titulos < 10 ? 4 : 0) : '—'}</td>
             <td class="r num">${o.precio ? Util.num(o.precio) : '—'}</td>
@@ -5737,7 +5780,7 @@ const Vistas = (() => {
         <th class="r">Precio hoy</th><th class="r">Desde entonces</th><th class="r">Te ahorraste</th><th></th></tr></thead>
         <tbody>${mrc.length ? mrc.map(m => `<tr>
           <td class="nowrap">${Util.fecha(m.o.fecha)}<div class="small mut">hace ${Util.num(m.meses, 0)} meses</div></td>
-          <td class="tick">${Util.esc(m.a.ticker)}</td>
+          <td class="tick">${Util.nt(m.a)}</td>
           <td class="r num">${Util.num(m.o.titulos, m.o.titulos < 10 ? 4 : 0)}</td>
           <td class="r num">${Util.num(m.precioVenta)}</td>
           <td class="r num">${Util.num(m.precioHoy)}</td>
@@ -5752,7 +5795,7 @@ const Vistas = (() => {
         <tbody>${revs.length ? revs.map(r => {
           const a = Store.activo(r.activoId);
           return `<tr><td class="nowrap">${Util.fecha(r.fecha)}</td>
-            <td class="tick">${a ? Util.esc(a.ticker) : '—'}</td>
+            <td class=\"tick\">${a ? Util.nt(a) : '—'}</td>
             <td><span class="pill ${r.veredicto}">${ACCIONES[r.veredicto] || r.veredicto}</span></td>
             <td class="small soft">${Util.esc(r.nota)}</td></tr>`;
         }).join('') : `<tr><td colspan="4" class="vacio">Todavía no has registrado ninguna revisión.</td></tr>`}</tbody>`;
@@ -5833,7 +5876,7 @@ const Vistas = (() => {
           const a = Store.activo(v.activoId);
           return `<tr>
             <td class="nowrap">${Util.fecha(v.fecha)}</td>
-            <td class="tick">${a ? Util.esc(a.ticker) : '—'}${a && a.tipo === 'bono' ? '<small>bono · rendimiento del capital, no ganancia patrimonial</small>'
+            <td class=\"tick\">${a ? Util.nt(a) : '—'}${a && a.tipo === 'bono' ? '<small>bono · rendimiento del capital, no ganancia patrimonial</small>'
               : v.bloqueada ? `<small class="neg">${v.parcial ? `aparcada al ${Util.num(v.parteBloqueada * 100, 0)} %` : 'aparcada'}</small>` : ''}</td>
             <td class="r num">${Util.num(v.titulos, v.titulos < 10 ? 4 : 0)}</td>
             <td class="r num">${Util.eur(v.importe, 0)}</td>
@@ -5846,7 +5889,7 @@ const Vistas = (() => {
       /* Dividendos e intereses juntos, por fecha: tributan igual */
       const rcm = [
         ...f.divs.map(o => { const a = Store.activo(o.activoId);
-          return { fecha: o.fecha, que: a ? Util.esc(a.ticker) : '—', sub: 'dividendo', bruto: o.importe, ret: o.retencion }; }),
+          return { fecha: o.fecha, que: a ? Util.esc(Util.nombreDe(a)) : '—', sub: a ? Util.esc(a.ticker) + ' · dividendo' : 'dividendo', bruto: o.importe, ret: o.retencion }; }),
         ...f.ints.map(i => ({ fecha: i.fecha, que: 'Intereses', sub: Util.esc(i.cuenta || 'cuenta'), bruto: Util.n(i.importe), ret: Util.n(i.retencion) }))
       ].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
       const totB = f.divBruto + f.intBruto, totR = f.divRet + f.intRet;
@@ -5874,13 +5917,13 @@ const Vistas = (() => {
       const L = [['Tipo', 'Fecha', 'Activo', 'Titulos', 'Importe', 'Coste', 'Resultado', 'Detalle'].join(';')];
       f.ventas.forEach(v => {
         const a = Store.activo(v.activoId);
-        L.push(['Venta', v.fecha, a ? a.ticker : '', v.titulos, v.importe.toFixed(2), v.coste.toFixed(2), v.resultado.toFixed(2),
+        L.push(['Venta', v.fecha, a ? Util.nombreDe(a).replace(/;/g, ' ') : '', v.titulos, v.importe.toFixed(2), v.coste.toFixed(2), v.resultado.toFixed(2),
           v.consumidos.map(c => `${c.titulos} de ${c.fecha} a ${c.precio}`).join(' | ') + (v.bloqueada ? ` [aparcada${v.parcial ? ` al ${Math.round(v.parteBloqueada * 100)} %` : ''} por la regla de los dos meses]` : '')]
           .join(';').replace(/\./g, ','));
       });
       f.divs.forEach(o => {
         const a = Store.activo(o.activoId);
-        L.push(['Dividendo', o.fecha, a ? a.ticker : '', '', o.importe.toFixed(2), '', (o.importe - o.retencion).toFixed(2), 'retencion ' + o.retencion.toFixed(2)]
+        L.push(['Dividendo', o.fecha, a ? Util.nombreDe(a).replace(/;/g, ' ') : '', '', o.importe.toFixed(2), '', (o.importe - o.retencion).toFixed(2), 'retencion ' + o.retencion.toFixed(2)]
           .join(';').replace(/\./g, ','));
       });
       (f.ints || []).forEach(i => {
@@ -5970,7 +6013,7 @@ const Vistas = (() => {
           const a = Store.activo(n.activoId);
           return `<tr>
             <td class="nowrap">${Util.fecha(n.fecha)}</td>
-            <td class="tick">${a ? Util.esc(a.ticker) : '—'}</td>
+            <td class=\"tick\">${a ? Util.nt(a) : '—'}</td>
             <td><b>${Util.esc(n.titular)}</b>
               ${n.resumen ? `<div class="small soft" style="max-width:520px">${Util.esc(n.resumen)}</div>` : ''}
               <div class="small mut">${Util.esc(n.fuente || '')}${n.url ? ` · <a href="${Util.esc(n.url)}" target="_blank" rel="noopener">abrir</a>` : ''}</div></td>
@@ -6063,12 +6106,12 @@ const Vistas = (() => {
 
       /* 2 · Pesos frente al tope */
       $('#g-pesos').innerHTML = Graf.barrasH(
-        abiertas.map(f => ({ e: f.a.ticker, v: f.peso, color: f.peso > Util.n(Store.ajustes().topePosicion) ? 'var(--v-reducir)' : 'var(--g1)' })),
+        abiertas.map(f => ({ e: Util.nombreDe(f.a), v: f.peso, color: f.peso > Util.n(Store.ajustes().topePosicion) ? 'var(--v-reducir)' : 'var(--g1)' })),
         { ref: Util.n(Store.ajustes().topePosicion), fmt: v => Util.num(v, 1) + ' %', vacio: 'Sin posiciones abiertas.' });
 
       /* 3 · Latente por posición */
       if ($('#g-latente')) $('#g-latente').innerHTML = Graf.divergente(
-        abiertas.map(f => ({ e: f.a.ticker, v: f.p.latentePct })),
+        abiertas.map(f => ({ e: Util.nombreDe(f.a), v: f.p.latentePct })),
         { fmt: v => Util.signo(v) + ' %', vacio: 'Sin posiciones abiertas.' });
 
       /* 4 y 5 · Repartos */
@@ -6080,14 +6123,14 @@ const Vistas = (() => {
         const roic = Calc.ultimo(a, 'roic') || (a.serie.length ? a.serie[a.serie.length - 1].roic : null);
         const mult = a.cotizacion.per || (a.serie.length ? a.serie[a.serie.length - 1].evEbit : null);
         if (!roic || !mult) return null;
-        return { e: a.ticker, x: mult, y: roic, r: c.pesoDe(a.id) || 1 };
+        return { e: Util.nombreDe(a, 16), x: mult, y: roic, r: c.pesoDe(a.id) || 1 };
       }).filter(Boolean);
       $('#g-mapa').innerHTML = Graf.dispersion(mapa, { ejeX: 'Múltiplo de beneficios (más a la derecha, más caro)', ejeY: 'Rentabilidad sobre el capital (%)' })
         + `<p class="nota-graf">El tamaño de cada burbuja es su peso en la cartera. Una burbuja grande abajo a la derecha —negocio mediocre y caro— es justo lo que no quieres tener grande.</p>`;
 
       /* 7 · Margen de seguridad */
       const marg = Store.activos().filter(a => Calc.valorable(a) && (a.estado === 'cartera' || a.estado === 'vigilancia'))
-        .map(a => ({ e: a.ticker + (a.estado === 'vigilancia' ? ' ·' : ''), v: Calc.margen(a) }))
+        .map(a => ({ e: Util.nombreDe(a) + (a.estado === 'vigilancia' ? ' ·' : ''), v: Calc.margen(a) }))
         .filter(d => d.v !== null).sort((x, y) => y.v - x.v);
       $('#g-margen').innerHTML = Graf.divergente(marg, { fmt: v => Util.signo(v, 0) + ' %', vacio: 'Escribe escenarios de valoración para ver esto.' })
         + `<p class="nota-graf">En negativo, el precio ya supera tu escenario base. Las marcadas con un punto están en vigilancia, sin posición.</p>`;
@@ -6101,7 +6144,7 @@ const Vistas = (() => {
       ];
       const filas = Store.activos().filter(a => a.tesis.hipotesis.length &&
         (a.estado === 'cartera' || a.estado === 'vigilancia')).map(a => ({
-          e: a.ticker,
+          e: Util.nombreDe(a),
           partes: ['cumpliendo', 'vigilar', 'rota', 'pendiente'].map((k, i) => ({
             v: a.tesis.hipotesis.filter(h => h.estado === k).length,
             color: cats[i].color, nombre: cats[i].nombre
@@ -6124,7 +6167,7 @@ const Vistas = (() => {
       Store.activos().forEach(a => {
         const m = METRICAS.filter(x => x.hist).map(x => ({ x, e: Calc.estadistica(a, x.k) })).find(o => o.e);
         if (!m || m.e.min === m.e.max) return;
-        rangos.push({ e: a.ticker, etiqueta: m.x.n, actual: m.e.actual, mediana: m.e.mediana, min: m.e.min, max: m.e.max });
+        rangos.push({ e: Util.nombreDe(a), etiqueta: m.x.n, actual: m.e.actual, mediana: m.e.mediana, min: m.e.min, max: m.e.max });
       });
       $('#g-percentil').innerHTML = Graf.rangos(rangos);
     }
@@ -6395,7 +6438,7 @@ const Vistas = (() => {
         const por = {};
         r.posiciones.forEach(p => { por[p.ticker] = (por[p.ticker] || 0) + p.latente; });
         r.cerradas.forEach(c => { por[c.ticker] = (por[c.ticker] || 0) + c.resultado; });
-        const datos = Object.entries(por).map(([e, v]) => ({ e, v })).sort((a, b) => b.v - a.v);
+        const datos = Object.entries(por).map(([e, v]) => ({ e: Util.nombreDe(e), v })).sort((a, b) => b.v - a.v);
         return `<div class="contrib-papel" style="--col:${x.color}">
           <div class="contrib-papel-t"><span class="papel-sello">Papel</span>${Util.esc(x.c.nombre)}
             <span class="small mut">· ${Util.eur(datos.reduce((s, d) => s + d.v, 0), 0)} en total</span></div>
@@ -6409,7 +6452,7 @@ const Vistas = (() => {
       const bm = Store.get().benchmark;
       const aj = Store.ajustes();
       $('#rd-ref').innerHTML = acts.map(a =>
-        `<option value="${a.id}" ${a.id === aj.benchmarkId ? 'selected' : ''}>${Util.esc(a.ticker)} · ${Util.esc(a.nombre)} (${(a.serie || []).length} precios)</option>`).join('')
+        `<option value="${a.id}" ${a.id === aj.benchmarkId ? 'selected' : ''}>${Util.esc(Util.nombreDe(a))} (${Util.esc(a.ticker)}) (${(a.serie || []).length} precios)</option>`).join('')
         + (bm.serie.length ? `<option value="serie" ${aj.benchmarkId === 'serie' ? 'selected' : ''}>${Util.esc(bm.nombre || 'Índice cargado')} (${bm.serie.length} niveles)</option>` : '');
       $('#rd-ref').onchange = () => { aj.benchmarkId = $('#rd-ref').value; Store.save(); };
 
@@ -6480,7 +6523,7 @@ const Vistas = (() => {
 
       const con = Calc.contribucion();
       $('#rd-contrib').innerHTML = Graf.divergente(
-        con.map(c => ({ e: c.a.ticker, v: c.total })),
+        con.map(c => ({ e: Util.nombreDe(c.a), v: c.total })),
         { fmt: v => Util.eur(v, 0), vacio: 'Sin operaciones registradas.' })
         + `<p class="nota-graf">Suma de plusvalía latente, resultado ya realizado y dividendos netos de cada posición.</p>`
         + (puestas.length ? contribPapel(puestas) : '');
@@ -6490,7 +6533,7 @@ const Vistas = (() => {
         <thead><tr><th>Activo</th><th class="r">Latente</th><th class="r">Realizado</th>
         <th class="r">Dividendos</th><th class="r">Total</th><th class="r">Peso en el resultado</th></tr></thead>
         <tbody>${con.map(c => `<tr>
-          <td class="tick">${Util.esc(c.a.ticker)}<small>${Util.esc(c.a.nombre)}</small></td>
+          <td class="tick">${Util.nt(c.a)}</td>
           <td class="r num ${c.p.latente >= 0 ? 'pos' : 'neg'}">${Util.eur(c.p.latente, 0)}</td>
           <td class="r num">${c.p.realizado ? Util.eur(c.p.realizado, 0) : '—'}</td>
           <td class="r num">${c.p.dividendos ? Util.eur(c.p.dividendos - c.p.retenido, 0) : '—'}</td>
@@ -6545,7 +6588,7 @@ const Vistas = (() => {
       const a = Store.activo(activoId);
 
       $('#dt-activo').innerHTML = acts.map(x =>
-        `<option value="${x.id}" ${x.id === activoId ? 'selected' : ''}>${Util.esc(x.ticker)} · ${Util.esc(x.nombre)} (${x.serie.length})</option>`).join('');
+        `<option value="${x.id}" ${x.id === activoId ? 'selected' : ''}>${Util.esc(Util.nombreDe(x))} (${Util.esc(x.ticker)}) (${x.serie.length})</option>`).join('');
       const conDatos = METRICAS.filter(m => a.serie.some(t => isFinite(t[m.k]) && t[m.k] !== undefined));
       if (!conDatos.some(m => m.k === metrica)) metrica = (conDatos[0] || METRICAS[0]).k;
       $('#dt-metrica').innerHTML = (conDatos.length ? conDatos : METRICAS).map(m =>
@@ -6556,7 +6599,7 @@ const Vistas = (() => {
       const corte = meses ? new Date(Date.now() - meses * 2629800000).toISOString().slice(0, 10) : '';
       const tomas = a.serie.filter(t => !corte || t.fecha >= corte);
 
-      $('#dt-titulo').textContent = `${a.ticker} · ${m.n}`;
+      $('#dt-titulo').textContent = `${Util.nombreDe(a)} · ${m.n}`;
       $('#dt-sub').textContent = m.def || '';
       $('#dt-grafico').innerHTML = grafico(tomas, m);
 
@@ -6709,7 +6752,7 @@ const Enlaces = (() => {
   }
   function ventana(id) {
     const a = Store.activo(id); if (!a) return;
-    Modal.abrir({ titulo: `Enlaces · ${a.ticker}`, cuerpo: `<p class="small mut" style="margin:0 0 12px">${Util.esc(a.nombre)}${a.isin ? ' · ' + Util.esc(a.isin) : ''}. Se abren aparte; la consola sigue aquí.</p>${botones(a)}`,
+    Modal.abrir({ titulo: `Enlaces · ${Util.nombreDe(a)}`, cuerpo: `<p class="small mut" style="margin:0 0 12px">${Util.esc(a.nombre)}${a.isin ? ' · ' + Util.esc(a.isin) : ''}. Se abren aparte; la consola sigue aquí.</p>${botones(a)}`,
       pie: `<button class="btn" data-cerrar>Cerrar</button>` });
   }
   return { BOLSAS, codigo, yahoo, de, botones, ventana, bolsaDe, bolsaNombre };
@@ -6943,7 +6986,7 @@ const Ficha = (() => {
       </div>`;
 
     Modal.abrir({
-      titulo: `${a.ticker} · ${a.nombre}`, cuerpo, ancho: true,
+      titulo: `${Util.nombreDe(a)} · ${a.ticker}`, cuerpo, ancho: true,
       pie: `<button class="btn" data-cerrar>Cerrar sin guardar</button>
             ${p.abierta ? '<button class="btn" id="fi-simular">Simular venta</button>' : ''}
             <button class="btn" id="fi-revisar">Registrar revisión</button>
@@ -6993,7 +7036,7 @@ const Ficha = (() => {
           const e = a.estudios.find(x => x.id === b.dataset.esBorrar);
           Modal.confirmar('Borrar el estudio del ' + Util.fecha(e.fecha),
             '«' + e.titular + '». No se puede recuperar salvo deshaciendo.', () => {
-              Store.marcar('Borrado de un estudio de ' + a.ticker);
+              Store.marcar('Borrado de un estudio de ' + Util.nombreDe(a));
               a.estudios = a.estudios.filter(x => x.id !== b.dataset.esBorrar);
               Store.save(); abrir(id); Util.toast('Estudio borrado');
             }, 'Borrar');
@@ -7076,7 +7119,7 @@ const Ficha = (() => {
     const a = Store.activo(id);
     const v = Motor.evaluar(a, Calc.cartera());
     Modal.abrir({
-      titulo: 'Revisión de ' + a.ticker,
+      titulo: 'Revisión de ' + Util.nombreDe(a),
       cuerpo: `
         <p class="soft small" style="margin-bottom:12px">El semáforo dice <b>${ACCIONES[v.accion]}</b>. Lo que decidas tú es lo que queda escrito.</p>
         <div class="field"><label>Tu decisión</label>
@@ -7267,7 +7310,7 @@ const Ops = (() => {
       titulo: 'Registrar operación',
       cuerpo: `<div class="form-grid">
           <div class="field"><label>Activo</label><select id="op-ac">${acts.map(a =>
-            `<option value="${a.id}" ${a.id === activoId ? 'selected' : ''}>${Util.esc(a.ticker)} · ${Util.esc(a.nombre)}</option>`).join('')}</select></div>
+            `<option value="${a.id}" ${a.id === activoId ? 'selected' : ''}>${Util.esc(Util.nombreDe(a))} (${Util.esc(a.ticker)})</option>`).join('')}</select></div>
           <div class="field"><label>Tipo</label><select id="op-tp">
             ${[['compra', 'Compra'], ['venta', 'Venta'], ['dividendo', 'Dividendo'], ['comision', 'Gasto']]
               .map(([k, l]) => `<option value="${k}" ${k === (tipo || 'compra') ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
@@ -7358,7 +7401,7 @@ const Ops = (() => {
           <div class="card-b tight tbl-wrap"><table>
             <thead><tr><th>Activo</th><th class="r">Precio guardado</th><th class="r" style="width:130px">Nuevo</th></tr></thead>
             <tbody>${acts.map(a => `<tr>
-              <td class="tick">${Util.esc(a.ticker)}<small>${Util.esc(a.nombre)}</small></td>
+              <td class="tick">${Util.nt(a)}</td>
               <td class="r num mut">${Util.num(a.cotizacion.precio)} · ${Util.fecha(a.cotizacion.fecha)}</td>
               <td class="r"><input type="number" step="any" class="num" style="text-align:right" data-pp="${a.id}" placeholder="${Util.num(a.cotizacion.precio)}"></td>
             </tr>`).join('')}</tbody></table></div></div>
@@ -7712,7 +7755,7 @@ const Encargo = (() => {
     Modal.abrir({
       titulo: 'Anotar una novedad',
       cuerpo: `<div class="form-grid">
-          <div class="field"><label>Activo</label><select id="nt-ac">${acts.map(a => `<option value="${a.id}">${Util.esc(a.ticker)} · ${Util.esc(a.nombre)}</option>`).join('')}</select></div>
+          <div class="field"><label>Activo</label><select id="nt-ac">${acts.map(a => `<option value="${a.id}">${Util.esc(Util.nombreDe(a))} (${Util.esc(a.ticker)})</option>`).join('')}</select></div>
           <div class="field"><label>Fecha</label><input type="date" id="nt-fe" value="${Util.hoy()}"></div>
           <div class="field"><label>Impacto</label><select id="nt-im"><option value="alto">Alto</option><option value="medio" selected>Medio</option><option value="bajo">Bajo</option></select></div>
           <div class="field"><label>Sobre la tesis</label><select id="nt-ef"><option value="refuerza">La refuerza</option><option value="debilita">La debilita</option><option value="incierto" selected>Aún no se sabe</option></select></div>
@@ -7802,10 +7845,10 @@ const Sim = (() => {
           ? (r.titulosAparcados >= r.titulos - 0.0000001 ? 'Esta pérdida no te la vas a poder compensar todavía' : 'Parte de esta pérdida queda aparcada')
           : 'Vendes con pérdidas: cuidado con recomprar'}</b>
         <p>${r.comprasRecientes.length
-          ? `Compraste ${Util.esc(r.a.ticker)} el ${Util.fecha(r.comprasRecientes[r.comprasRecientes.length - 1].fecha)}, dentro de los dos meses anteriores, y tras esta venta te seguirían quedando ${Util.num(Math.min(r.titulosAparcados, r.titulos), 0)} de esos títulos. ${r.titulosAparcados >= r.titulos - 0.0000001
+          ? `Compraste ${Util.esc(Util.nombreDe(r.a))} el ${Util.fecha(r.comprasRecientes[r.comprasRecientes.length - 1].fecha)}, dentro de los dos meses anteriores, y tras esta venta te seguirían quedando ${Util.num(Math.min(r.titulosAparcados, r.titulos), 0)} de esos títulos. ${r.titulosAparcados >= r.titulos - 0.0000001
               ? 'La pérdida entera'
               : `Esa parte de la pérdida (unos ${Util.eur(Math.abs(r.ganancia) * Math.min(1, r.titulosAparcados / r.titulos), 0)} de ${Util.eur(Math.abs(r.ganancia), 0)})`} queda aparcada hasta que vendas también esos títulos.`
-          : `Si vuelves a comprar ${Util.esc(r.a.ticker)} dentro de los dos meses siguientes, la pérdida no se puede compensar hasta que vendas los títulos nuevos. ${r.cierraPosicion ? 'Cerrando la posición entera y sin recomprar, computa toda.' : ''}`}</p></div></li></ul>` : ''}
+          : `Si vuelves a comprar ${Util.esc(Util.nombreDe(r.a))} dentro de los dos meses siguientes, la pérdida no se puede compensar hasta que vendas los títulos nuevos. ${r.cierraPosicion ? 'Cerrando la posición entera y sin recomprar, computa toda.' : ''}`}</p></div></li></ul>` : ''}
 
       ${r.esBono ? `<p class="nota-graf">Es un bono: lo que ganes o pierdas al venderlo o al vencer tributa como rendimiento del capital (como los intereses), no como ganancia patrimonial. Fiscal ya lo cuenta así.</p>` : ''}
       <p class="nota-graf">El impuesto es una estimación con la escala estatal del ahorro sobre los datos que has puesto arriba. No incluye nada más que haya pasado en tu declaración, y no soy asesor fiscal: para una operación grande, consúltalo.</p>`;
@@ -7874,7 +7917,7 @@ const Comp = (() => {
       cuerpo: `<p class="soft small" style="margin-bottom:12px">Elige dos o más. Lo interesante suele ser enfrentar lo que ya tienes con lo que estás mirando.</p>
         ${acts.map(a => `<label class="chk" style="padding:5px 0">
           <input type="checkbox" data-cmp="${a.id}" ${a.estado === 'vigilancia' ? 'checked' : ''}>
-          <span>${Util.esc(a.ticker)} · ${Util.esc(a.nombre)} <span class="mut small">${a.estado === 'vigilancia' ? '· en vigilancia' : ''}</span></span></label>`).join('')}`,
+          <span>${Util.esc(Util.nombreDe(a))} <span class=\"tk-mini\">${Util.esc(a.ticker)}</span> <span class="mut small">${a.estado === 'vigilancia' ? '· en vigilancia' : ''}</span></span></label>`).join('')}`,
       pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn pri" id="cmp-ok">Comparar</button>`,
       alAbrir: () => $('#cmp-ok').onclick = () => {
         const ids = $$('[data-cmp]').filter(c => c.checked).map(c => c.dataset.cmp);
@@ -7907,7 +7950,7 @@ const Comp = (() => {
     Modal.abrir({
       titulo: 'Comparación', ancho: true,
       cuerpo: `<div class="tbl-wrap"><table>
-        <thead><tr><th>Criterio</th>${acts.map(a => `<th class="r">${Util.esc(a.ticker)}</th>`).join('')}</tr></thead>
+        <thead><tr><th>Criterio</th>${acts.map(a => `<th class="r" title="${Util.esc(a.ticker)}">${Util.esc(Util.nombreDe(a, 16))}</th>`).join('')}</tr></thead>
         <tbody>
           <tr><td>Veredicto del semáforo</td>${acts.map(a => {
             const v = Motor.evaluar(a, c);
@@ -7944,7 +7987,7 @@ const Tomas = (() => {
       cuerpo: `
         <div class="form-grid">
           <div class="field"><label>Activo</label><select id="tm-ac">${acts.map(a =>
-            `<option value="${a.id}" ${a.id === sel ? 'selected' : ''}>${Util.esc(a.ticker)} · ${Util.esc(a.nombre)}</option>`).join('')}</select></div>
+            `<option value="${a.id}" ${a.id === sel ? 'selected' : ''}>${Util.esc(Util.nombreDe(a))} (${Util.esc(a.ticker)})</option>`).join('')}</select></div>
           <div class="field"><label>Fecha del dato</label><input type="date" id="tm-fe" value="${Util.hoy()}"></div>
           <div class="field"><label>Fuente</label><input id="tm-fu" placeholder="De dónde lo has sacado"></div>
         </div>

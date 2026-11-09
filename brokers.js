@@ -448,7 +448,7 @@ const Brokers = (() => {
 
         ${pl.sobran.length ? `<ul class="motivos" style="margin-top:12px"><li class="alta"><i class="sev"></i><div>
           <b>En la consola, pero no en el extracto</b>
-          <p>${pl.sobran.map(a => Util.esc(a.ticker)).join(', ')}: los tienes como posición abierta en ${Util.esc(ex.broker)},
+          <p>${pl.sobran.map(a => Util.esc(Util.nombreDe(a))).join(', ')}: los tienes como posición abierta en ${Util.esc(ex.broker)},
           pero el bróker ya no los lista. ¿Los vendiste? Importa los movimientos para que entre la venta.</p></div></li></ul>` : ''}
 
         ${(desc.length || nuevos.length) ? `<p class="small mut" style="margin-top:12px">No invento compras ni ventas: sin su

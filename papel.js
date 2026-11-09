@@ -346,7 +346,7 @@ const Papel = (() => {
           <th class="r">Precio</th><th class="r">Valor</th><th class="r">Latente</th><th>Desde</th><th class="no-print"></th></tr></thead>
           <tbody>${r.posiciones.length ? r.posiciones.map(p => `
             <tr>
-              <td class="tick">${Util.esc(p.ticker)}${p.dePrecio ? `<small>precio de ${p.dePrecio}</small>` : ''}</td>
+              <td class="tick">${Util.nt(p.ticker, p.dePrecio ? 'precio de ' + Util.esc(p.dePrecio) : '')}</td>
               <td class="r num">${Util.num(p.titulos, p.titulos < 10 ? 2 : 0)}</td>
               <td class="r num">${Util.num(p.costeMedio)}</td>
               <td class="r"><input type="number" step="any" class="num" style="width:88px;text-align:right"
@@ -360,15 +360,15 @@ const Papel = (() => {
 
         ${r.cerradas.length ? `
         <div class="bloque-t" style="padding:0 var(--pad)">Operaciones cerradas
-          ${r.cerradas.length > 1 ? `<span class="small mut" style="font-weight:400"> · mejor ${Util.esc(r.mejor.ticker)} ${Util.signo(r.mejor.pct, 0)} %
-          · peor ${Util.esc(r.peor.ticker)} ${Util.signo(r.peor.pct, 0)} %${r.diasMedios ? ` · ${Util.num(r.diasMedios, 0)} días de media` : ''}</span>`
+          ${r.cerradas.length > 1 ? `<span class="small mut" style="font-weight:400"> · mejor ${Util.esc(Util.nombreDe(r.mejor.ticker))} ${Util.signo(r.mejor.pct, 0)} %
+          · peor ${Util.esc(Util.nombreDe(r.peor.ticker))} ${Util.signo(r.peor.pct, 0)} %${r.diasMedios ? ` · ${Util.num(r.diasMedios, 0)} días de media` : ''}</span>`
           : r.diasMedios ? `<span class="small mut" style="font-weight:400"> · ${Util.num(r.diasMedios, 0)} días en cartera</span>` : ''}</div>
         <div class="card-b tight tbl-wrap"><table>
           <thead><tr><th>Valor</th><th>Comprada</th><th>Vendida</th><th class="r">Títulos</th>
           <th class="r">Coste</th><th class="r">Ingreso</th><th class="r">Resultado</th><th class="r">Días</th></tr></thead>
           <tbody>${r.cerradas.slice().reverse().map(x => `
             <tr>
-              <td class="tick">${Util.esc(x.ticker)}</td>
+              <td class="tick">${Util.nt(x.ticker)}</td>
               <td class="small soft">${x.abierto ? Util.fecha(x.abierto) : '—'}</td>
               <td class="small soft">${Util.fecha(x.fecha)}</td>
               <td class="r num">${Util.num(x.titulos, 0)}</td>
@@ -387,7 +387,7 @@ const Papel = (() => {
             <tr>
               <td class="small soft">${Util.fecha(o.fecha)}</td>
               <td><span class="pill ${o.tipo === 'compra' ? 'comprar' : 'vender'}">${o.tipo === 'compra' ? 'Compra' : 'Venta'}</span></td>
-              <td class="tick">${Util.esc(o.ticker)}</td>
+              <td class="tick">${Util.nt(o.ticker)}</td>
               <td class="r num">${Util.num(o.titulos, 0)}</td>
               <td class="r num">${Util.num(o.precio)}</td>
               <td class="r num">${Util.num(o.comision)}</td>
@@ -482,7 +482,7 @@ const Papel = (() => {
       cuerpo: `
         ${venta ? `<div class="field"><label>Qué vendo</label>
             <select id="pa-otk">${r.posiciones.map(p => `<option value="${Util.esc(p.ticker)}" ${p.ticker === tkPrevio ? 'selected' : ''}>
-              ${Util.esc(p.ticker)} · ${Util.num(p.titulos, 0)} títulos a ${Util.num(p.costeMedio)} de coste</option>`).join('')}</select></div>`
+              ${Util.esc(Util.nombreDe(p.ticker))} (${Util.esc(p.ticker)}) · ${Util.num(p.titulos, 0)} títulos a ${Util.num(p.costeMedio)} de coste</option>`).join('')}</select></div>`
           : `${extra.elegir && carteras().length > 1 ? `<div class="field" style="margin-bottom:12px"><label>En qué cartera de papel</label>
             <select id="pa-ocar">${carteras().filter(x => !x.cerrada || x.id === c.id).map(x => `<option value="${x.id}" ${x.id === c.id ? 'selected' : ''}>${Util.esc(x.nombre)}</option>`).join('')}</select></div>` : ''}
             <div class="field"><label>Qué compro</label>
@@ -547,7 +547,7 @@ const Papel = (() => {
           if (venta) {
             const p = r.posiciones.find(x => x.ticker === tk);
             if (!p || tit > p.titulos + 0.0000001) {
-              Util.toast(`Solo tienes ${Util.num((p || {}).titulos || 0, 0)} títulos de ${tk}`, 'err'); return;
+              Util.toast(`Solo tienes ${Util.num((p || {}).titulos || 0, 0)} títulos de ${Util.nombreDe(tk)}`, 'err'); return;
             }
           }
           const destino = ($('#pa-ocar') && cartera($('#pa-ocar').value)) || c;

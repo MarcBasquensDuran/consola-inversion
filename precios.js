@@ -229,7 +229,7 @@ const Precios = (() => {
     const k = conf();
     const conectado = Nube.hayClientId() && Nube.estado().conectado;
     const sinDato = est.sinDato || [], sinCodigo = est.sinCodigo || [];
-    const nombreDe = x => { const a = Store.activo(x.id || x.clave); return Util.esc(a ? a.ticker : x.ticker); };
+    const nombreDe = x => { const a = Store.activo(x.id || x.clave); return Util.esc(Util.nombreDe(a || x.ticker)); };
     c.innerHTML = `
       <label class="chk" style="display:flex;gap:8px;align-items:flex-start">
         <input type="checkbox" id="pr-on" ${k.activo ? 'checked' : ''} ${conectado ? '' : 'disabled'}>

@@ -111,7 +111,7 @@ const Estudio = (() => {
             const on = sel.has(a.id);
             return `<label class="chip ${on ? 'on' : ''}" style="--col:${a.estado === 'cartera' ? 'var(--g1)' : 'var(--g3)'};${elegible ? '' : 'opacity:.4'}">
               <input type="checkbox" data-es-emp="${a.id}" ${on ? 'checked' : ''} style="width:auto;margin:0">
-              <span>${Util.esc(a.ticker)}</span>
+              <span>${Util.esc(Util.nombreDe(a))} <span class="tk-mini">${Util.esc(a.ticker)}</span></span>
               <span class="n">${a.estado === 'cartera' ? 'cartera' : 'vigilancia'}</span></label>`;
           }).join('');
 

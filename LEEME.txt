@@ -634,3 +634,24 @@ VERSIÓN 15 · PRECIOS SOLOS, VENTAS CON FECHA, ESTUDIOS DISCRETOS
   · «Pegar de una lista» en Actualizar precios: «TAR;41,20» se leía
     como 41. Ahora con punto y coma o tabulador la coma es decimal.
   · Cambiar el precio en la ficha pone su fecha a hoy.
+
+
+==============================================================
+VERSIÓN 16 · NOMBRES EN VEZ DE TICKERS
+==============================================================
+
+  En todas las pestañas sale el nombre de la empresa, y el ticker
+  pequeño debajo o al lado, solo como referencia: Semáforo,
+  Cartera, vigilancia, Análisis (gráficos incluidos), Seguimiento,
+  Cribado, Operaciones, Fiscal, carteras de papel, desplegables,
+  avisos y el calendario.
+  · Se quitan «S.A.», «Inc.», «plc»… para que se lea mejor.
+  · En los gráficos, el hueco de la izquierda se adapta al nombre;
+    si es muy largo se corta con «…» y, al pasar el ratón, sale
+    entero.
+  · «Por orden alfabético» ordena ahora por nombre.
+  · El CSV fiscal lleva el nombre en la columna «Activo».
+  · Un nombre que no te guste (o un valor importado con unas
+    iniciales): ábrelo y cámbialo en la ficha → Identidad → Nombre.
+  · El encargo de estudio sigue llevando ticker y nombre: así quien
+    lo lea no se equivoca de empresa.
